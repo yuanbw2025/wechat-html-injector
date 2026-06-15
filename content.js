@@ -61,7 +61,7 @@
         get(k, d) { const v = this._read()[k]; return v === undefined ? d : v; },
         set(k, v) { const c = this._read(); c[k] = v; localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); },
     };
-    state.width = Config.get('width', 480);
+    state.width = Config.get('width', 560);
     state.previewOn = Config.get('previewOn', true);
 
     // =========================================================
@@ -422,6 +422,7 @@
         .wh-toolbtn-light:hover{ border-color:#07c160; color:#07c160; filter:none; }
         #wh-toolbtn-group{
             display:inline-flex; align-items:center; gap:6px; margin-left:8px; vertical-align:middle;
+            max-width:120px; flex:0 0 auto; overflow:visible;
         }
         #wh-toolbtn-li{ display:inline-flex; list-style:none; margin:0; padding:0; }
 
@@ -483,6 +484,7 @@
             background:var(--wh-bg); font-family:var(--wh-font);
             box-shadow:8px 0 40px rgba(15,23,42,.18);
             display:flex; flex-direction:column;
+            max-width:calc(100vw - 24px);
             transform:translateX(-100%); transition:transform .28s cubic-bezier(.16,1,.3,1);
         }
         #wh-panel.wh-open{ transform:translateX(0); }
@@ -509,6 +511,19 @@
         }
         .wh-tab:hover{ color:#07c160; }
         .wh-tab.wh-on{ color:#07c160; border-bottom-color:#07c160; background:#fff; }
+
+        .wh-quickbar{
+            display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px;
+            padding:10px 12px; border-bottom:1px solid var(--wh-border); background:#fff;
+        }
+        .wh-quick{
+            height:34px; border-radius:9px; border:1px solid var(--wh-border);
+            background:#fff; color:var(--wh-text); font-family:var(--wh-font);
+            font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
+        }
+        .wh-quick:hover{ border-color:#07c160; color:#07c160; background:#f0fdf4; }
+        .wh-quick-primary{ background:#07c160; border-color:#07c160; color:#fff; }
+        .wh-quick-primary:hover{ background:#05a854; color:#fff; }
 
         /* 内容窗格（同一面板内切换，不弹框） */
         .wh-pane{ flex:1; min-height:0; display:none; flex-direction:column; overflow:hidden; }
@@ -682,6 +697,13 @@
                 <button class="wh-tab" data-tab="code">&lt;/&gt; 源码</button>
                 <button class="wh-tab" data-tab="image">🖼 图片</button>
             </div>
+            <div class="wh-quickbar">
+                <button class="wh-quick wh-quick-primary" id="wh-q-layout">一键排版</button>
+                <button class="wh-quick" id="wh-q-read">读取</button>
+                <button class="wh-quick" id="wh-q-apply">应用HTML</button>
+                <button class="wh-quick" id="wh-q-code">源码</button>
+                <button class="wh-quick" id="wh-q-image">图片库</button>
+            </div>
 
             <div class="wh-pane wh-on" data-pane="style">
                 <div class="wh-gal-actions">
@@ -775,46 +797,14 @@
         if (!bar) return false;
         const group = document.createElement('span');
         group.id = 'wh-toolbtn-group';
-        group.appendChild(createToolbarButton({
+        const btn = createToolbarButton({
             id: 'wh-toolbtn',
             className: 'wh-toolbtn-green',
             label: '云中书',
             title: '打开云中书页面内工作台',
             onClick: () => { openPanel(); switchTab('style'); },
-        }));
-        group.appendChild(createToolbarButton({
-            className: 'wh-toolbtn-light',
-            label: '读取',
-            title: '读取公众号原生编辑区当前 HTML',
-            onClick: () => { openPanel(); switchTab('code'); readFromArticle(true); },
-        }));
-        group.appendChild(createToolbarButton({
-            className: 'wh-toolbtn-light',
-            label: '应用HTML',
-            title: '把源码框 HTML 应用到公众号原生编辑区',
-            onClick: () => {
-                openPanel(); switchTab('code');
-                const v = elCode?.value?.trim();
-                if (!v) { toast('源码框为空，先读取或粘贴 HTML', 'warning'); return; }
-                applyWhole(v);
-            },
-        }));
-        group.appendChild(createToolbarButton({
-            className: 'wh-toolbtn-light',
-            label: '图片库',
-            title: '扫描公众号原生编辑区里的图片',
-            onClick: () => { openPanel(); switchTab('image'); renderImageLibrary(); },
-        }));
-        group.appendChild(createToolbarButton({
-            className: 'wh-toolbtn-pink',
-            label: '一键排版',
-            title: '用当前云中书方案排版公众号原生正文',
-            onClick: () => {
-                openPanel(); switchTab('style');
-                ensureLayIds();
-                if (layIds) { applyLayout(layIds); markActive(); }
-            },
-        }));
+        });
+        group.appendChild(btn);
         if (bar.tagName === 'UL') {
             const li = document.createElement('li');
             li.id = 'wh-toolbtn-li';
@@ -909,6 +899,20 @@
         // 读取文章
         elPanel.querySelector('#wh-read').onclick = () => readFromArticle(true);
         elPanel.querySelector('#wh-banner-read').onclick = () => readFromArticle(true);
+        elPanel.querySelector('#wh-q-read').onclick = () => { switchTab('code'); readFromArticle(true); };
+        elPanel.querySelector('#wh-q-code').onclick = () => switchTab('code');
+        elPanel.querySelector('#wh-q-image').onclick = () => { switchTab('image'); renderImageLibrary(); };
+        elPanel.querySelector('#wh-q-layout').onclick = () => {
+            switchTab('style');
+            ensureLayIds();
+            if (layIds) { applyLayout(layIds); markActive(); }
+        };
+        elPanel.querySelector('#wh-q-apply').onclick = () => {
+            switchTab('code');
+            const v = elCode.value.trim();
+            if (!v) { toast('源码框为空，先读取或粘贴 HTML', 'warning'); return; }
+            applyWhole(v);
+        };
 
         // 应用 / 追加
         elPanel.querySelector('#wh-apply').onclick = () => {
