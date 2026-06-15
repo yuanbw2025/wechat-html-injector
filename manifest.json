@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "微信公众号HTML插入器",
-    "version": "3.2.0",
-    "description": "在微信公众号编辑器中插入自定义HTML代码（真实剪贴板版）",
+    "name": "微信公众号HTML编辑器",
+    "version": "4.7.0",
+    "description": "在公众号原生页面内嵌云中书工作台，支持顶部快捷工具、双向源码同步、原生图片读取与整篇排版。",
     "icons": {
         "48": "icon.png",
         "128": "icon.png"
@@ -14,7 +14,7 @@
                 "https://mp.weixin.qq.com/cgi-bin/appmsg*",
                 "https://mp.weixin.qq.com/appmsg/*"
             ],
-            "js": ["content.js"],
+            "js": ["engine.js", "content.js"],
             "run_at": "document_end"
         }
     ]
