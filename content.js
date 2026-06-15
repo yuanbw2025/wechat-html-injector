@@ -975,6 +975,70 @@
 
     function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+    function pushTextAsMarkdown(lines, text) {
+        const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!normalized) return;
+        const blocks = structureDenseText(normalized);
+        blocks.forEach((block, index) => {
+            if (block) {
+                lines.push(block);
+                const next = blocks[index + 1];
+                if (!(isMarkdownListLine(block) && isMarkdownListLine(next))) lines.push('');
+            }
+        });
+    }
+
+    function isMarkdownListLine(text) {
+        return /^(\d{1,2}[.]|[-*+]\s|[一二三四五六七八九十]{1,3}、)/.test(String(text || '').trim());
+    }
+
+    function structureDenseText(text) {
+        const s = text.trim();
+        if (!s) return [];
+        const hasNumberedItems = /(?:^|[。；;!！?？\s])(?:\d{1,2}|[一二三四五六七八九十]{1,3})[.、]/.test(s);
+        const startsWithStep = /^Step\s*\d*/i.test(s);
+        if (!hasNumberedItems && !startsWithStep && s.length < 140) return [s];
+
+        const blocks = [];
+        let rest = s;
+        const firstItemIndex = rest.search(/(?:\d{1,2}|[一二三四五六七八九十]{1,3})[.、]/);
+        if (startsWithStep && firstItemIndex > 8) {
+            const title = rest.slice(0, firstItemIndex).replace(/[。；;，,\s]+$/, '').trim();
+            if (title) blocks.push(`## ${title}`);
+            rest = rest.slice(firstItemIndex).trim();
+        }
+
+        const itemParts = splitNumberedItems(rest);
+        if (itemParts.length >= 2) {
+            itemParts.forEach(part => {
+                const normalized = part
+                    .replace(/^(\d{1,2})[.、]\s*/, '$1. ')
+                    .replace(/^([一二三四五六七八九十]{1,3})[.、]\s*/, '$1、')
+                    .trim();
+                if (normalized) blocks.push(normalized);
+            });
+            return blocks;
+        }
+
+        return splitLongParagraph(rest).map(part => part.trim()).filter(Boolean);
+    }
+
+    function splitNumberedItems(text) {
+        const marked = text
+            .replace(/([。；;!！?？])\s*((?:\d{1,2}|[一二三四五六七八九十]{1,3})[.、])/g, '$1\n$2')
+            .replace(/([^\n])((?:\d{1,2}|[一二三四五六七八九十]{1,3})[.、])(?=[^\d])/g, '$1\n$2');
+        return marked.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    }
+
+    function splitLongParagraph(text) {
+        if (text.length < 180) return [text];
+        return text
+            .replace(/([。！？!?])\s*/g, '$1\n')
+            .split(/\n+/)
+            .map(x => x.trim())
+            .filter(Boolean);
+    }
+
     // 把原生正文 DOM 转成 Markdown，保留标题/列表/引用/图片结构，供排版引擎用
     function htmlToMarkdown(root) {
         const inline = (el) => {
@@ -996,14 +1060,14 @@
         const blockImgs = (el) => el.querySelectorAll('img').forEach(im => lines.push('![](' + (im.getAttribute('src') || im.src || '') + ')'));
         const walk = (parent) => {
             parent.childNodes.forEach(node => {
-                if (node.nodeType === 3) { const t = node.textContent.trim(); if (t) { lines.push(t); lines.push(''); } return; }
+                if (node.nodeType === 3) { pushTextAsMarkdown(lines, node.textContent); return; }
                 if (node.nodeType !== 1) return;
                 const tag = node.tagName.toLowerCase();
                 if (/^h[1-6]$/.test(tag)) { lines.push('#'.repeat(+tag[1]) + ' ' + inline(node).trim()); lines.push(''); }
                 else if (tag === 'p' || tag === 'section' || tag === 'div') {
                     const imgs = node.querySelectorAll('img');
                     const txt = inline(node).trim();
-                    if (txt) { lines.push(txt); lines.push(''); }
+                    if (txt) { pushTextAsMarkdown(lines, txt); }
                     else if (imgs.length) { blockImgs(node); lines.push(''); }
                     else if (!txt && node.children.length && !imgs.length) { walk(node); }
                 }
@@ -1013,10 +1077,16 @@
                 else if (tag === 'hr') { lines.push('---'); lines.push(''); }
                 else if (tag === 'img') { lines.push('![](' + (node.getAttribute('src') || node.src || '') + ')'); lines.push(''); }
                 else if (node.children.length) walk(node);
-                else { const t = inline(node).trim(); if (t) { lines.push(t); lines.push(''); } }
+                else { const t = inline(node).trim(); if (t) pushTextAsMarkdown(lines, t); }
             });
         };
         walk(root);
+        return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function normalizeLayoutMarkdown(md) {
+        const lines = [];
+        String(md || '').split(/\n{2,}/).forEach(block => pushTextAsMarkdown(lines, block));
         return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
     }
 
@@ -1024,8 +1094,8 @@
     function captureLayoutSource() {
         const r = findEditor();
         if (!r) return '';
-        if (state.styled && state.layoutRaw) return state.layoutRaw;
-        const md = htmlToMarkdown(r.editor);
+        if (state.styled && state.layoutRaw) return normalizeLayoutMarkdown(state.layoutRaw);
+        const md = normalizeLayoutMarkdown(htmlToMarkdown(r.editor));
         state.layoutRaw = md;
         return md;
     }
