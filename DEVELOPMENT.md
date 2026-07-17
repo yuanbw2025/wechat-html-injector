@@ -66,13 +66,25 @@ cd ~/Desktop/projects/wechat-html-injector
 > 之前 v4.4 试过"iframe 内嵌整个云中书应用"，因公众号页面 CSP 可能禁止跨源 iframe 而**放弃**——壹伴能嵌是因为它走扩展原生 DOM，不是外部 iframe。故 v4.5 改为原生 DOM。
 > 云中书 `yuntype` 仓库里残留的 `?embed=1` 桥接（`App.tsx` / `FloatingActionBar.tsx`）已无用，可保留也可清理。
 
-## 原生编辑区同步（v4.7）
+## 原生左栏与编辑区同步（v4.9）
 
-v4.7 起，公众号编辑器 `.ProseMirror` 是唯一内容真源：
+v4.9 起，插件按壹伴类形态优先挂载到微信公众号编辑页原生左栏，而不是用 fixed 弹窗模拟：
+
+- 自动寻找 `#js_mp_sidemenu` 和 `#js_side_article_list`，把云中书工作台 prepend 到原生左栏容器。
+- 展开/收起/拖拽时同步控制 `#js_side_article_list` 的宽度与 `is-collapsed` 状态，保证它是真实占位，不遮挡正文。
+- 找不到微信左栏节点时才退回 fixed 面板兜底。
+- 初始化必须通过 `findEditor()` 确认真实正文编辑器存在，禁止等待超时后强制创建面板。微信是单页应用，`evaluatePageLifecycle()` 会在离开编辑页时调用 `destroyUI()`，恢复原生左栏并移除所有插件入口；重新进入编辑页后再挂载。
+- 工作台布局为左侧 52px 竖向 rail + 右侧内容区，样式 / HTML / 图片 / AI 配置都在 rail 上下排布。
+- 样式页内只有顶部二级标签：骨架 / 配色 / 字体。切换二级标签时只显示对应类别。
+- 微信原生封面区域隐藏逻辑必须收窄到封面控件本身，不能隐藏包含 `.ProseMirror`、`#js_appmsg_editor`、`#js_mp_sidemenu`、`#js_side_article_list` 的祖先容器。
+
+公众号编辑器 `.ProseMirror` 是唯一内容真源：
 
 - `MutationObserver` 监听原生编辑区的 `childList/subtree/attributes/characterData`，用户直接在公众号里改正文、格式或粘贴图片后，源码面板会读取最新 `editor.innerHTML`。
-- 插件主动写回时使用 `state.applying` 避免把自己的写入误判成用户编辑；源码框被程序同步时使用 `state.syncingCode` 避免触发草稿脏状态。
-- 顶部工具栏按钮和左侧面板共用 `applyWhole/readFromArticle/applyLayout/renderImageLibrary`，不要为新按钮另写一套 DOM 写入逻辑。
+- HTML 标签页只有一个源码 textarea。用户粘贴或修改 HTML 后，`scheduleLiveApplyHTML()` 防抖写回原生编辑区；用户在原生编辑区编辑后，观察器回写 textarea。
+- 插件主动写回时使用 `state.applying` 避免把自己的写入误判成用户编辑；源码框被程序同步时使用 `state.syncingCode` 避免触发草稿脏状态或同步循环。
+- 顶部工具栏按钮和左侧面板共用 `applyWhole/readFromArticle/applyLayout/renderImageLibrary/runAIAdjust`，不要为新按钮另写一套 DOM 写入逻辑。
+- AI 调整走 OpenAI-compatible `/v1/chat/completions`。Endpoint、模型、API Key、默认指令统一在 AI 配置页维护，不再用 `prompt()` 连续弹窗；API Key 只存在本机 `localStorage`，返回 HTML 仍通过 `applyWhole()` 写回原生编辑区。
 - 图片不走微信上传接口逆向。可靠路径是：用户先用公众号原生能力上传/粘贴图片，插件扫描编辑区里的最终 `<img>` URL，再在 HTML 中引用。
 
 ## 本地目录结构
