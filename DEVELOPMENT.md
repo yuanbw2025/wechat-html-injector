@@ -87,6 +87,15 @@ v4.9 起，插件按壹伴类形态优先挂载到微信公众号编辑页原生
 - AI 调整走 OpenAI-compatible `/v1/chat/completions`。Endpoint、模型、API Key、默认指令统一在 AI 配置页维护，不再用 `prompt()` 连续弹窗；API Key 只存在本机 `localStorage`，返回 HTML 仍通过 `applyWhole()` 写回原生编辑区。
 - 图片不走微信上传接口逆向。可靠路径是：用户先用公众号原生能力上传/粘贴图片，插件扫描编辑区里的最终 `<img>` URL，再在 HTML 中引用。
 
+## AI 工作台与本地知识库（v5.0）
+
+- `content.js` 的 **知识** 页面把排版格式、常用指令和参考文档存到 IndexedDB；无法使用 IndexedDB 时回退到现有 `localStorage` 配置。
+- **对话** 页面使用当前正文、关键词检索到的本地知识和用户主动添加的附件组装上下文。
+- AI 必须返回 `{ reply, actions }` JSON；`replace_html` / `insert_html` 操作显示在对话消息下，由用户确认后复用 `applyWhole()` / `appendToArticle()` 写回，并保留最多 20 个撤销快照。
+- 图片和剪贴板截图作为 `image_url` 发送；TXT、Markdown、JSON、CSV、HTML 直接读取；PDF 做基础文本操作符提取；DOCX 在浏览器内读取 `word/document.xml`。
+- `background.js` 是 MV3 service worker，只转发单次 AI 请求来解决跨域，不保存 API Key、聊天内容或附件。
+- 当前实现是本地关键词 RAG，不依赖远程向量数据库；后续若增加 Embedding，应继续保持知识条目默认本地保存和显式发送边界。
+
 ## 本地目录结构
 
 所有项目统一存放在 `~/Desktop/projects/` 下：

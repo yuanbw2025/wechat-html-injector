@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         微信公众号HTML编辑器-侧边源码版
 // @namespace    https://mp.weixin.qq.com/
-// @version      4.9.6
-// @description  原生左栏工作台：单一HTML编辑区实时双向同步微信公众号原生编辑区，页面化AI配置、护眼背景与图片保护。
+// @version      5.0.0
+// @description  原生左栏 AI 工作台：本地知识库、AI 对话、图片文件附件与可确认的 HTML 调整。
 // @author       AI Assistant
 // @match        https://mp.weixin.qq.com/cgi-bin/appmsg*
 // @match        https://mp.weixin.qq.com/appmsg/*
@@ -23,7 +23,7 @@
         warn: (m, ...a) => console.warn(`${TAG} ⚠️ ${m}`, ...a),
         error: (m, ...a) => console.error(`${TAG} ❌ ${m}`, ...a),
     };
-    log.info('脚本启动 v4.9.6 — 编辑页门禁 + 常驻左栏 + HTML 实时双向同步 + 护眼背景皮肤');
+    log.info('脚本启动 v5.0.0 — 编辑页门禁 + 本地知识库 + AI 对话 + 附件调整');
 
     // =========================================================
     //  全局状态
@@ -59,6 +59,13 @@
         entryObserver: null,
         missingEditorChecks: 0,
         keyHandlerBound: false,
+        knowledgeDocs: [],
+        knowledgeReady: false,
+        chatHistory: [],
+        chatAttachments: [],
+        chatBusy: false,
+        chatContextOn: true,
+        articleSnapshots: [],
     };
 
     // =========================================================
@@ -81,6 +88,90 @@
     state.previewOn = Config.get('previewOn', true);
     state.styleMode = Config.get('styleMode', 'blueprint');
     state.readingBg = Config.get('readingBg', 'default');
+    state.chatContextOn = Config.get('chatContextOn', true);
+    try { state.chatHistory = Config.get('chatHistory', []).slice(-40); }
+    catch { state.chatHistory = []; }
+
+    // =========================================================
+    //  本地知识库：优先 IndexedDB，无法使用时回退到插件现有本地配置
+    // =========================================================
+    const KNOWLEDGE_DB = 'wechat-html-editor-knowledge-v1';
+    let knowledgeDBPromise = null;
+    function openKnowledgeDB() {
+        if (knowledgeDBPromise) return knowledgeDBPromise;
+        if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+        knowledgeDBPromise = new Promise(resolve => {
+            try {
+                const req = indexedDB.open(KNOWLEDGE_DB, 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains('documents')) {
+                        const store = db.createObjectStore('documents', { keyPath: 'id' });
+                        store.createIndex('updatedAt', 'updatedAt');
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            } catch { resolve(null); }
+        });
+        return knowledgeDBPromise;
+    }
+    function idbRequest(request) {
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+        });
+    }
+    async function loadKnowledgeDocuments() {
+        const db = await openKnowledgeDB();
+        if (!db) return Config.get('knowledgeDocs', []);
+        try {
+            const tx = db.transaction('documents', 'readonly');
+            const docs = await idbRequest(tx.objectStore('documents').getAll());
+            return docs.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        } catch { return Config.get('knowledgeDocs', []); }
+    }
+    async function saveKnowledgeDocument(doc) {
+        const db = await openKnowledgeDB();
+        if (!db) {
+            const docs = getKnowledgeDocuments().filter(item => item.id !== doc.id);
+            Config.set('knowledgeDocs', [doc, ...docs].slice(0, 200));
+            return;
+        }
+        try {
+            const tx = db.transaction('documents', 'readwrite');
+            await idbRequest(tx.objectStore('documents').put(doc));
+        } catch {
+            const docs = getKnowledgeDocuments().filter(item => item.id !== doc.id);
+            Config.set('knowledgeDocs', [doc, ...docs].slice(0, 200));
+        }
+    }
+    async function removeKnowledgeDocument(id) {
+        const db = await openKnowledgeDB();
+        if (!db) {
+            Config.set('knowledgeDocs', getKnowledgeDocuments().filter(item => item.id !== id));
+            return;
+        }
+        try {
+            const tx = db.transaction('documents', 'readwrite');
+            await idbRequest(tx.objectStore('documents').delete(id));
+        } catch {
+            Config.set('knowledgeDocs', getKnowledgeDocuments().filter(item => item.id !== id));
+        }
+    }
+    function getKnowledgeDocuments() { return Array.isArray(state.knowledgeDocs) ? state.knowledgeDocs : []; }
+    function makeLocalId(prefix = 'item') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
+    function persistChatHistory() {
+        Config.set('chatHistory', state.chatHistory.slice(-40).map(item => ({
+            role: item.role,
+            content: String(item.content || '').slice(0, 12000),
+            actions: Array.isArray(item.actions) ? item.actions.slice(0, 4).map(action => ({
+                type: action.type,
+                html: String(action.html || '').slice(0, 50000),
+            })) : [],
+            createdAt: item.createdAt || Date.now(),
+        })));
+    }
 
     // =========================================================
     //  模板片段
@@ -264,14 +355,19 @@
     }
 
     function cleanHTML(html) {
-        return html
-            .replace(/<!--[\s\S]*?-->/g, '')
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-            .replace(/<object[\s\S]*?<\/object>/gi, '')
-            .replace(/<embed[^>]*>/gi, '')
-            .replace(/<form[\s\S]*?<\/form>/gi, '')
-            .replace(/\s(on\w+)\s*=\s*["'][^"']*["']/gi, '');
+        const template = document.createElement('template');
+        template.innerHTML = String(html || '');
+        template.content.querySelectorAll('script,iframe,object,embed,form,link,meta,base').forEach(el => el.remove());
+        template.content.querySelectorAll('*').forEach(el => {
+            [...el.attributes].forEach(attr => {
+                const name = attr.name.toLowerCase();
+                const value = attr.value.trim();
+                if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction') el.removeAttribute(attr.name);
+                else if (['href', 'src', 'data-src', 'xlink:href'].includes(name) && /^\s*(javascript|vbscript):/i.test(value)) el.removeAttribute(attr.name);
+                else if (name === 'style' && /(expression\s*\(|javascript\s*:|vbscript\s*:)/i.test(value)) el.removeAttribute(attr.name);
+            });
+        });
+        return template.innerHTML;
     }
 
     function formatHTMLForCode(html) {
@@ -389,6 +485,7 @@
         if (!r) { if (!opts.silent) toast('未找到编辑器，请先点一下正文区域', 'error'); return false; }
         const html = cleanHTML(code);
         try {
+            if (opts.snapshot !== false) pushArticleSnapshot();
             state.applying = true;
             r.editor.innerHTML = html;
             dispatchEditorInput(r.editor);
@@ -421,6 +518,7 @@
         const r = ensureEditorObserved();
         if (!r) { toast('未找到编辑器', 'error'); return false; }
         const html = cleanHTML(code);
+        pushArticleSnapshot();
         if (insertViaClipboard(r.editor, r.doc, html, false)) {
             state.applying = true;
             setTimeout(() => {
@@ -460,6 +558,148 @@
 
     function debounce(fn, ms) {
         let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+    }
+
+    function fileToDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(reader.error || new Error('文件读取失败'));
+            reader.readAsDataURL(file);
+        });
+    }
+    function fileToText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(reader.error || new Error('文本读取失败'));
+            reader.readAsText(file);
+        });
+    }
+    function decodePdfLiteral(value) {
+        return value
+            .replace(/\\([\\()])/g, '$1')
+            .replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t')
+            .replace(/\\([0-7]{1,3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
+    }
+    async function extractPdfText(file) {
+        const buffer = await file.arrayBuffer();
+        const source = new TextDecoder('latin1').decode(buffer);
+        const blocks = source.match(/BT[\s\S]*?ET/g) || [];
+        const lines = [];
+        blocks.forEach(block => {
+            const parts = [];
+            block.replace(/\(((?:\\.|[^\\)])*)\)\s*Tj/g, (_, value) => { parts.push(decodePdfLiteral(value)); return _; });
+            block.replace(/\[((?:[\s\S]*?))\]\s*TJ/g, (_, value) => {
+                value.replace(/\(((?:\\.|[^\\)])*)\)/g, (__, text) => { parts.push(decodePdfLiteral(text)); return __; });
+                return _;
+            });
+            if (parts.length) lines.push(parts.join(''));
+        });
+        const text = lines.join('\n').replace(/[ \t]{2,}/g, ' ').trim();
+        if (!text) throw new Error('PDF 未提取到可读文本，可能是扫描版或字体压缩格式');
+        return text;
+    }
+    function readUint16(bytes, offset) { return bytes[offset] | (bytes[offset + 1] << 8); }
+    function readUint32(bytes, offset) { return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0; }
+    async function extractDocxText(file) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let eocd = -1;
+        for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+            if (readUint32(bytes, i) === 0x06054b50) { eocd = i; break; }
+        }
+        if (eocd < 0) throw new Error('DOCX 压缩包结构无法读取');
+        const centralOffset = readUint32(bytes, eocd + 16);
+        const centralSize = readUint32(bytes, eocd + 12);
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        let offset = centralOffset;
+        let target = null;
+        while (offset < centralOffset + centralSize && readUint32(bytes, offset) === 0x02014b50) {
+            const method = readUint16(bytes, offset + 10);
+            const compressedSize = readUint32(bytes, offset + 20);
+            const nameLength = readUint16(bytes, offset + 28);
+            const extraLength = readUint16(bytes, offset + 30);
+            const commentLength = readUint16(bytes, offset + 32);
+            const localOffset = readUint32(bytes, offset + 42);
+            const name = new TextDecoder().decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+            if (name === 'word/document.xml') target = { method, compressedSize, localOffset };
+            offset += 46 + nameLength + extraLength + commentLength;
+        }
+        if (!target) throw new Error('DOCX 中未找到正文');
+        const local = target.localOffset;
+        if (readUint32(bytes, local) !== 0x04034b50) throw new Error('DOCX 正文数据损坏');
+        const nameLength = view.getUint16(local + 26, true);
+        const extraLength = view.getUint16(local + 28, true);
+        const compressed = bytes.slice(local + 30 + nameLength + extraLength, local + 30 + nameLength + extraLength + target.compressedSize);
+        let xmlBytes = compressed;
+        if (target.method === 8) {
+            if (typeof DecompressionStream === 'undefined') throw new Error('当前浏览器不支持 DOCX 解压');
+            const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+            xmlBytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        } else if (target.method !== 0) throw new Error('DOCX 使用了暂不支持的压缩方式');
+        const xml = new TextDecoder().decode(xmlBytes);
+        const text = xml
+            .replace(/<w:tab\s*\/?\s*>/gi, '\t')
+            .replace(/<w:br\s*\/?\s*>/gi, '\n')
+            .replace(/<\/w:p\s*>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+            .trim();
+        if (!text) throw new Error('DOCX 未提取到正文');
+        return text;
+    }
+    function isTextAttachment(file) {
+        return /^text\//i.test(file.type) || /\.(txt|md|markdown|json|csv|html|htm|xml|css|js|ts)$/i.test(file.name);
+    }
+    async function readAttachment(file) {
+        const name = file.name || '未命名文件';
+        if (file.size > 12 * 1024 * 1024) throw new Error('文件超过 12MB，请先压缩或截取需要的部分');
+        if (/^image\//i.test(file.type) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) {
+            return { id: makeLocalId('attachment'), name, type: file.type || 'image/*', kind: 'image', dataUrl: await fileToDataURL(file), size: file.size };
+        }
+        let text;
+        if (isTextAttachment(file)) text = await fileToText(file);
+        else if (/\.pdf$/i.test(name) || file.type === 'application/pdf') text = await extractPdfText(file);
+        else if (/\.docx$/i.test(name) || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') text = await extractDocxText(file);
+        else throw new Error('暂不支持此文件格式，请使用图片、文本、PDF 或 DOCX');
+        return { id: makeLocalId('attachment'), name, type: file.type || 'text/plain', kind: 'text', text: text.slice(0, 24000), size: file.size };
+    }
+    async function readAttachmentFiles(files) {
+        const out = [];
+        for (const file of [...files]) {
+            try { out.push(await readAttachment(file)); }
+            catch (error) { toast(`${file.name || '文件'}：${error.message}`, 'warning'); }
+        }
+        return out;
+    }
+
+    function knowledgeTypeLabel(type) {
+        return type === 'style' ? '排版' : type === 'instruction' ? '指令' : '文档';
+    }
+    function splitSearchTerms(value) {
+        const source = String(value || '').toLowerCase();
+        const terms = source.match(/[\u4e00-\u9fff]|[a-z0-9_]{2,}/g) || [];
+        return [...new Set(terms)].slice(0, 80);
+    }
+    function retrieveKnowledge(query, limit = 6) {
+        const terms = splitSearchTerms(query);
+        if (!terms.length) return [];
+        return getKnowledgeDocuments().map(doc => {
+            const haystack = `${doc.title || ''} ${doc.tags || ''} ${doc.text || ''}`.toLowerCase();
+            let score = 0;
+            terms.forEach(term => {
+                let from = 0;
+                let count = 0;
+                while ((from = haystack.indexOf(term, from)) >= 0 && count < 8) { count++; from += term.length; }
+                score += count * (String(doc.title || '').toLowerCase().includes(term) ? 4 : 1);
+            });
+            if (doc.type === 'instruction' && /调整|排版|样式|指令|格式/.test(query)) score += 1;
+            return { doc, score };
+        }).filter(item => item.score > 0).sort((a, b) => b.score - a.score || (b.doc.updatedAt || 0) - (a.doc.updatedAt || 0)).slice(0, limit).map(item => item.doc);
+    }
+    function knowledgeContext(query) {
+        return retrieveKnowledge(query).map((doc, index) => `【知识 ${index + 1}｜${doc.title}｜${knowledgeTypeLabel(doc.type)}】\n${String(doc.text || '').slice(0, 6000)}`).join('\n\n');
     }
 
     // 轻量美化：仅做换行 + 缩进，便于阅读（应用前请看预览确认）
@@ -908,6 +1148,48 @@
         .wh-settings-actions{ display:flex; gap:8px; }
         .wh-settings-actions .wh-mini-btn{ flex:1; height:30px; }
 
+        /* ---- 本地知识库与 AI 对话 ---- */
+        .wh-kb-toolbar,.wh-chat-toolbar{ display:flex; gap:6px; align-items:center; padding:7px; border-bottom:1px solid var(--wh-border); background:#f8fafc; }
+        .wh-kb-toolbar .wh-input{ flex:1; min-width:0; height:25px; padding:4px 7px; }
+        .wh-kb-list{ flex:1 1 34%; min-height:70px; overflow:auto; padding:6px 7px; border-bottom:1px solid var(--wh-border); }
+        .wh-kb-item{ display:flex; gap:6px; align-items:center; padding:7px 8px; border:1px solid transparent; border-radius:7px; cursor:pointer; }
+        .wh-kb-item:hover,.wh-kb-item.wh-on{ background:#f0fdf4; border-color:#bbf7d0; }
+        .wh-kb-item-main{ min-width:0; flex:1; }
+        .wh-kb-item-title{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:800 11px/1.4 var(--wh-font); color:#334155; }
+        .wh-kb-item-meta{ display:block; color:#94a3b8; font:10px/1.4 var(--wh-font); }
+        .wh-kb-item-del{ border:0; background:transparent; color:#94a3b8; cursor:pointer; padding:2px 4px; }
+        .wh-kb-item-del:hover{ color:#ef4444; }
+        .wh-kb-editor{ padding:8px; display:flex; flex-direction:column; gap:6px; overflow:auto; }
+        .wh-kb-editor .wh-input{ height:27px; padding:5px 7px; }
+        .wh-kb-row{ display:grid; grid-template-columns:1fr 1.4fr; gap:6px; }
+        .wh-kb-content{ min-height:120px; max-height:240px; }
+        .wh-kb-save{ align-self:flex-end; height:27px; }
+        .wh-check{ display:inline-flex; align-items:center; gap:4px; font:600 10.5px/1 var(--wh-font); color:#64748b; white-space:nowrap; }
+        .wh-check input{ accent-color:#07c160; }
+        .wh-chat-toolbar{ justify-content:space-between; }
+        .wh-chat-messages{ flex:1; min-height:120px; overflow:auto; padding:8px; background:#f8fafc; }
+        .wh-chat-empty{ color:#94a3b8; font:11px/1.6 var(--wh-font); text-align:center; padding:22px 10px; }
+        .wh-chat-message{ max-width:94%; margin:0 0 8px; display:flex; flex-direction:column; gap:4px; }
+        .wh-chat-message.wh-user{ margin-left:auto; align-items:flex-end; }
+        .wh-chat-message.wh-assistant{ align-items:flex-start; }
+        .wh-chat-bubble{ white-space:pre-wrap; overflow-wrap:anywhere; padding:8px 10px; border-radius:9px; font:12px/1.55 var(--wh-font); }
+        .wh-user .wh-chat-bubble{ background:#07c160; color:#fff; border-bottom-right-radius:3px; }
+        .wh-assistant .wh-chat-bubble{ background:#fff; color:#334155; border:1px solid var(--wh-border); border-bottom-left-radius:3px; }
+        .wh-chat-time{ color:#94a3b8; font:9px/1 var(--wh-font); }
+        .wh-chat-action{ margin-top:3px; display:flex; gap:5px; flex-wrap:wrap; }
+        .wh-chat-attachments{ display:flex; gap:5px; flex-wrap:wrap; min-height:0; padding:0 8px; background:#f8fafc; }
+        .wh-chat-attachment{ display:inline-flex; align-items:center; gap:4px; max-width:180px; padding:4px 6px; border:1px solid #bbf7d0; border-radius:6px; background:#f0fdf4; color:#166534; font:10px/1.2 var(--wh-font); }
+        .wh-chat-attachment img{ width:26px; height:26px; object-fit:cover; border-radius:4px; }
+        .wh-chat-attachment span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .wh-chat-attachment button{ border:0; background:transparent; color:#64748b; cursor:pointer; }
+        .wh-chat-compose{ padding:7px; border-top:1px solid var(--wh-border); background:#fff; }
+        .wh-chat-input{ min-height:54px; max-height:130px; }
+        .wh-chat-actions{ display:flex; align-items:center; gap:6px; margin-top:5px; }
+        .wh-chat-hint{ flex:1; color:#94a3b8; font:10px/1.2 var(--wh-font); }
+        .wh-chat-send{ background:#07c160; border-color:#07c160; color:#fff; min-width:48px; }
+        .wh-chat-send:hover{ color:#fff; background:#05a854; }
+        .wh-chat-send:disabled{ opacity:.55; cursor:wait; }
+
         /* ---- 阅读护眼背景：只影响编辑时的页面观感，不写入文章 HTML ---- */
         body.wh-reading-bg-on{
             background:var(--wh-reader-page) !important;
@@ -1027,6 +1309,8 @@
     //  DOM 引用
     // =========================================================
     let elPanel, elHandle, elCode, elPreviewWrap, elPreviewFrame, elImgGrid, elBanner, elPreviewBtn;
+    let elKbList, elKbSearch, elKbTitle, elKbType, elKbTags, elKbContent;
+    let elChatMessages, elChatInput, elChatAttachments, elChatFileInput, elChatContext;
 
     function buildUI() {
         if (document.getElementById('wh-panel')) return;
@@ -1053,6 +1337,8 @@
                     <button class="wh-rail-btn" data-tab="reader" title="护眼背景"><b>◐</b><span>护眼</span></button>
                     <button class="wh-rail-btn" data-tab="code" title="HTML"><b>&lt;/&gt;</b><span>HTML</span></button>
                     <button class="wh-rail-btn" data-tab="image" title="图片"><b>▧</b><span>图片</span></button>
+                    <button class="wh-rail-btn" data-tab="knowledge" title="知识库"><b>知</b><span>知识</span></button>
+                    <button class="wh-rail-btn" data-tab="chat" title="AI 对话"><b>AI</b><span>对话</span></button>
                     <button class="wh-rail-btn" data-tab="ai" title="AI"><b>AI</b><span>配置</span></button>
                 </div>
                 <div class="wh-rail-spacer"></div>
@@ -1114,6 +1400,50 @@
                     </div>
                 </div>
 
+                <div class="wh-pane" data-pane="knowledge">
+                    <div class="wh-pane-title"><span>本地知识库</span><small>只保存在本机</small></div>
+                    <div class="wh-kb-toolbar">
+                        <input class="wh-input" id="wh-kb-search" placeholder="搜索知识条目">
+                        <button class="wh-mini-btn" id="wh-kb-new">新建</button>
+                        <button class="wh-mini-btn" id="wh-kb-import">导入文件</button>
+                        <input id="wh-kb-file" type="file" hidden accept=".txt,.md,.markdown,.json,.csv,.html,.htm,.pdf,.docx,text/*,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                    </div>
+                    <div class="wh-kb-list" id="wh-kb-list"></div>
+                    <div class="wh-kb-editor">
+                        <input class="wh-input" id="wh-kb-title" placeholder="标题，例如：常用蓝灰样式">
+                        <div class="wh-kb-row">
+                            <select class="wh-input" id="wh-kb-type">
+                                <option value="instruction">常用指令</option>
+                                <option value="style">排版格式</option>
+                                <option value="document">参考文档</option>
+                            </select>
+                            <input class="wh-input" id="wh-kb-tags" placeholder="标签，用逗号分隔">
+                        </div>
+                        <textarea class="wh-textarea wh-kb-content" id="wh-kb-content" placeholder="写下排版规范、常用指令或参考文档内容"></textarea>
+                        <button class="wh-mini-btn wh-kb-save" id="wh-kb-save">保存条目</button>
+                    </div>
+                </div>
+
+                <div class="wh-pane" data-pane="chat">
+                    <div class="wh-pane-title"><span>AI 对话</span><small id="wh-chat-state">就绪</small></div>
+                    <div class="wh-chat-toolbar">
+                        <label class="wh-check"><input type="checkbox" id="wh-chat-context"> 带上当前正文</label>
+                        <button class="wh-mini-btn" id="wh-chat-undo" title="撤销 AI 上次修改">撤销</button>
+                        <button class="wh-mini-btn" id="wh-chat-clear">清空对话</button>
+                    </div>
+                    <div class="wh-chat-messages" id="wh-chat-messages"></div>
+                    <div class="wh-chat-attachments" id="wh-chat-attachments"></div>
+                    <div class="wh-chat-compose">
+                        <textarea class="wh-textarea wh-chat-input" id="wh-chat-input" placeholder="告诉 AI 要如何调整文章、HTML 或排版"></textarea>
+                        <div class="wh-chat-actions">
+                            <button class="wh-mini-btn" id="wh-chat-attach" title="添加图片、截图或文件">📎 附件</button>
+                            <input id="wh-chat-file" type="file" hidden multiple accept="image/*,.txt,.md,.markdown,.json,.csv,.html,.htm,.pdf,.docx,text/*,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                            <span class="wh-chat-hint">粘贴截图也可以</span>
+                            <button class="wh-mini-btn wh-chat-send" id="wh-chat-send">发送</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="wh-pane" data-pane="ai">
                     <div class="wh-pane-title"><span>AI 与 API</span><small>本机保存</small></div>
                     <div class="wh-settings">
@@ -1150,6 +1480,17 @@
         elImgGrid = elPanel.querySelector('#wh-imggrid');
         elBanner = elPanel.querySelector('#wh-banner');
         elPreviewBtn = elPanel.querySelector('#wh-previewtoggle');
+        elKbList = elPanel.querySelector('#wh-kb-list');
+        elKbSearch = elPanel.querySelector('#wh-kb-search');
+        elKbTitle = elPanel.querySelector('#wh-kb-title');
+        elKbType = elPanel.querySelector('#wh-kb-type');
+        elKbTags = elPanel.querySelector('#wh-kb-tags');
+        elKbContent = elPanel.querySelector('#wh-kb-content');
+        elChatMessages = elPanel.querySelector('#wh-chat-messages');
+        elChatInput = elPanel.querySelector('#wh-chat-input');
+        elChatAttachments = elPanel.querySelector('#wh-chat-attachments');
+        elChatFileInput = elPanel.querySelector('#wh-chat-file');
+        elChatContext = elPanel.querySelector('#wh-chat-context');
         populateAISettings();
 
         // 恢复草稿
@@ -1161,6 +1502,14 @@
         buildReadingBackgroundPane();
         applyReadingBackground(state.readingBg, { silent: true });
         bindEvents();
+        renderChatMessages();
+        renderChatAttachments();
+        elChatContext.checked = state.chatContextOn;
+        loadKnowledgeDocuments().then(docs => {
+            state.knowledgeDocs = Array.isArray(docs) ? docs : [];
+            state.knowledgeReady = true;
+            renderKnowledgeList();
+        });
         updatePreview();
         mountNativeSidePanel();
         mountEntry();
@@ -1368,6 +1717,280 @@
     }
 
     // =========================================================
+    //  知识库界面
+    // =========================================================
+    function resetKnowledgeEditor() {
+        state.knowledgeEditingId = null;
+        if (elKbTitle) elKbTitle.value = '';
+        if (elKbType) elKbType.value = 'instruction';
+        if (elKbTags) elKbTags.value = '';
+        if (elKbContent) elKbContent.value = '';
+        elKbList?.querySelectorAll('.wh-kb-item').forEach(el => el.classList.remove('wh-on'));
+    }
+    function editKnowledgeDocument(doc) {
+        state.knowledgeEditingId = doc.id;
+        if (elKbTitle) elKbTitle.value = doc.title || '';
+        if (elKbType) elKbType.value = doc.type || 'document';
+        if (elKbTags) elKbTags.value = Array.isArray(doc.tags) ? doc.tags.join(', ') : (doc.tags || '');
+        if (elKbContent) elKbContent.value = doc.text || '';
+        elKbList?.querySelectorAll('.wh-kb-item').forEach(el => el.classList.toggle('wh-on', el.dataset.id === doc.id));
+    }
+    function renderKnowledgeList() {
+        if (!elKbList) return;
+        const query = String(elKbSearch?.value || '').trim().toLowerCase();
+        const docs = getKnowledgeDocuments().filter(doc => !query || `${doc.title} ${doc.tags || ''} ${doc.text || ''}`.toLowerCase().includes(query));
+        elKbList.innerHTML = '';
+        if (!docs.length) {
+            const empty = document.createElement('div');
+            empty.className = 'wh-empty';
+            empty.textContent = query ? '没有匹配的知识条目' : '还没有本地知识条目';
+            elKbList.appendChild(empty);
+            return;
+        }
+        docs.forEach(doc => {
+            const item = document.createElement('div');
+            item.className = 'wh-kb-item';
+            item.dataset.id = doc.id;
+            if (doc.id === state.knowledgeEditingId) item.classList.add('wh-on');
+            const main = document.createElement('div');
+            main.className = 'wh-kb-item-main';
+            const title = document.createElement('span');
+            title.className = 'wh-kb-item-title';
+            title.textContent = doc.title || '未命名条目';
+            const meta = document.createElement('span');
+            meta.className = 'wh-kb-item-meta';
+            meta.textContent = `${knowledgeTypeLabel(doc.type)} · ${(doc.text || '').length} 字`;
+            main.append(title, meta);
+            const del = document.createElement('button');
+            del.className = 'wh-kb-item-del';
+            del.type = 'button';
+            del.title = '删除';
+            del.textContent = '×';
+            del.onclick = async event => {
+                event.stopPropagation();
+                if (!confirm(`删除知识条目「${doc.title || '未命名条目'}」？`)) return;
+                await removeKnowledgeDocument(doc.id);
+                state.knowledgeDocs = getKnowledgeDocuments().filter(item => item.id !== doc.id);
+                if (state.knowledgeEditingId === doc.id) resetKnowledgeEditor();
+                renderKnowledgeList();
+            };
+            item.onclick = () => editKnowledgeDocument(doc);
+            item.append(main, del);
+            elKbList.appendChild(item);
+        });
+    }
+    async function saveKnowledgeFromEditor() {
+        const title = String(elKbTitle?.value || '').trim();
+        const text = String(elKbContent?.value || '').trim();
+        if (!title || !text) { toast('请填写知识条目的标题和内容', 'warning'); return; }
+        const now = Date.now();
+        const existing = getKnowledgeDocuments().find(doc => doc.id === state.knowledgeEditingId);
+        const doc = {
+            id: existing?.id || makeLocalId('knowledge'),
+            title,
+            type: elKbType?.value || 'document',
+            tags: String(elKbTags?.value || '').split(/[,，]/).map(item => item.trim()).filter(Boolean).slice(0, 12),
+            text: text.slice(0, 30000),
+            createdAt: existing?.createdAt || now,
+            updatedAt: now,
+        };
+        await saveKnowledgeDocument(doc);
+        state.knowledgeDocs = [doc, ...getKnowledgeDocuments().filter(item => item.id !== doc.id)];
+        resetKnowledgeEditor();
+        renderKnowledgeList();
+        toast('知识条目已保存');
+    }
+    async function importKnowledgeFile(file) {
+        const attachment = await readAttachment(file);
+        if (attachment.kind !== 'text') throw new Error('知识库只导入文本内容，图片请放入 AI 对话附件');
+        const now = Date.now();
+        const doc = {
+            id: makeLocalId('knowledge'),
+            title: file.name.replace(/\.[^.]+$/, '') || '导入文档',
+            type: 'document', tags: [], text: attachment.text.slice(0, 30000), createdAt: now, updatedAt: now,
+        };
+        await saveKnowledgeDocument(doc);
+        state.knowledgeDocs = [doc, ...getKnowledgeDocuments()];
+        renderKnowledgeList();
+        toast(`已导入知识条目：${doc.title}`);
+    }
+
+    // =========================================================
+    //  对话界面与结构化操作
+    // =========================================================
+    function setChatState(text, type = '') {
+        if (!elPanel) return;
+        const el = elPanel.querySelector('#wh-chat-state');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = type === 'error' ? '#ef4444' : type === 'ok' ? '#07a855' : '#64748b';
+    }
+    function renderChatAttachments() {
+        if (!elChatAttachments) return;
+        elChatAttachments.innerHTML = '';
+        state.chatAttachments.forEach((attachment, index) => {
+            const item = document.createElement('span');
+            item.className = 'wh-chat-attachment';
+            if (attachment.kind === 'image') {
+                const img = document.createElement('img');
+                img.src = attachment.dataUrl;
+                img.alt = attachment.name;
+                item.appendChild(img);
+            }
+            const name = document.createElement('span');
+            name.textContent = attachment.name;
+            const remove = document.createElement('button');
+            remove.type = 'button'; remove.textContent = '×'; remove.title = '移除附件';
+            remove.onclick = () => { state.chatAttachments.splice(index, 1); renderChatAttachments(); };
+            item.append(name, remove);
+            elChatAttachments.appendChild(item);
+        });
+    }
+    function renderChatMessages() {
+        if (!elChatMessages) return;
+        elChatMessages.innerHTML = '';
+        if (!state.chatHistory.length) {
+            const empty = document.createElement('div');
+            empty.className = 'wh-chat-empty';
+            empty.textContent = '从当前正文、知识库或图片附件开始对话';
+            elChatMessages.appendChild(empty);
+            return;
+        }
+        state.chatHistory.forEach(message => {
+            const wrap = document.createElement('div');
+            wrap.className = `wh-chat-message wh-${message.role === 'user' ? 'user' : 'assistant'}`;
+            const bubble = document.createElement('div');
+            bubble.className = 'wh-chat-bubble';
+            bubble.textContent = message.content || '';
+            const time = document.createElement('span');
+            time.className = 'wh-chat-time';
+            time.textContent = message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            wrap.append(bubble, time);
+            if (message.role === 'assistant' && Array.isArray(message.actions) && message.actions.length) {
+                const actions = document.createElement('div');
+                actions.className = 'wh-chat-action';
+                message.actions.forEach((action, index) => {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.className = 'wh-mini-btn';
+                    button.textContent = action.type === 'insert_html' ? '插入到正文' : '应用到正文';
+                    button.onclick = () => applyChatAction(message, index);
+                    actions.appendChild(button);
+                });
+                wrap.appendChild(actions);
+            }
+            elChatMessages.appendChild(wrap);
+        });
+        elChatMessages.scrollTop = elChatMessages.scrollHeight;
+    }
+    function getArticleSnapshot() {
+        const r = findEditor();
+        return r ? r.editor.innerHTML : '';
+    }
+    function pushArticleSnapshot() {
+        const html = getArticleSnapshot();
+        if (!html && !state.articleSnapshots.length) return;
+        state.articleSnapshots.push({ html, createdAt: Date.now() });
+        if (state.articleSnapshots.length > 20) state.articleSnapshots.shift();
+    }
+    function undoLastArticleChange() {
+        const snapshot = state.articleSnapshots.pop();
+        if (!snapshot) { toast('没有可撤销的 AI 修改', 'warning'); return false; }
+        const ok = applyWhole(snapshot.html, { silent: true, snapshot: false });
+        if (ok) toast('已撤销上次修改');
+        return ok;
+    }
+    function normalizeChatResponse(raw) {
+        let text = String(raw || '').trim();
+        text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        let parsed = null;
+        try { parsed = JSON.parse(text); }
+        catch {
+            const start = text.indexOf('{');
+            const end = text.lastIndexOf('}');
+            if (start >= 0 && end > start) {
+                try { parsed = JSON.parse(text.slice(start, end + 1)); } catch { parsed = null; }
+            }
+        }
+        if (!parsed || typeof parsed !== 'object') return { reply: String(raw || '').trim(), actions: [] };
+        const actions = Array.isArray(parsed.actions) ? parsed.actions.filter(action => {
+            return action && ['replace_html', 'set_html', 'insert_html'].includes(action.type) && typeof action.html === 'string' && action.html.trim();
+        }).slice(0, 4).map(action => ({ type: action.type, html: action.html.slice(0, 50000) })) : [];
+        return { reply: String(parsed.reply || parsed.message || 'AI 已返回结果').trim(), actions };
+    }
+    function getChatArticleContext() {
+        const r = findEditor();
+        if (!r) return '';
+        const html = r.editor.innerHTML.trim();
+        const text = (r.editor.textContent || '').trim();
+        return `当前正文 HTML：\n${html.slice(0, 36000)}\n\n当前正文纯文本：\n${text.slice(0, 9000)}`;
+    }
+    function buildChatPrompt(text, attachments = state.chatAttachments) {
+        const pieces = [`用户请求：\n${text}`];
+        if (state.chatContextOn) {
+            const article = getChatArticleContext();
+            if (article) pieces.push(article);
+        }
+        const knowledge = knowledgeContext(text);
+        if (knowledge) pieces.push(`本地知识库检索结果（仅作参考）：\n${knowledge}`);
+        if (attachments.some(item => item.kind === 'text')) {
+            pieces.push(attachments.filter(item => item.kind === 'text').map(item => `附件《${item.name}》：\n${item.text}`).join('\n\n'));
+        }
+        return pieces.join('\n\n---\n\n');
+    }
+    async function sendChatMessage() {
+        if (state.chatBusy) return;
+        if (!state.knowledgeReady) {
+            const docs = await loadKnowledgeDocuments();
+            state.knowledgeDocs = Array.isArray(docs) ? docs : [];
+            state.knowledgeReady = true;
+        }
+        const text = String(elChatInput?.value || '').trim();
+        if (!text && !state.chatAttachments.length) { toast('请输入问题或添加附件', 'warning'); return; }
+        const attachments = state.chatAttachments.slice();
+        const displayText = `${text || '请分析附件'}${attachments.length ? `\n附件：${attachments.map(item => item.name).join('、')}` : ''}`;
+        state.chatHistory.push({ role: 'user', content: displayText, createdAt: Date.now() });
+        if (elChatInput) elChatInput.value = '';
+        state.chatAttachments = [];
+        renderChatAttachments(); renderChatMessages(); persistChatHistory();
+        state.chatBusy = true;
+        const sendButton = elPanel?.querySelector('#wh-chat-send');
+        if (sendButton) sendButton.disabled = true;
+        setChatState('思考中…');
+        const requestText = text || '请分析这些附件，并结合当前正文给出可执行的调整建议。';
+        try {
+            const result = await callAIChat(requestText, attachments);
+            state.chatHistory.push({ role: 'assistant', content: result.reply || 'AI 没有返回文字。', actions: result.actions, createdAt: Date.now() });
+            persistChatHistory();
+            renderChatMessages();
+            setChatState(result.actions.length ? '待确认应用' : '就绪', result.actions.length ? '' : 'ok');
+        } catch (error) {
+            state.chatHistory.push({ role: 'assistant', content: `请求失败：${error.message}`, actions: [], createdAt: Date.now() });
+            persistChatHistory(); renderChatMessages(); setChatState('请求失败', 'error');
+        } finally {
+            state.chatBusy = false;
+            if (sendButton) sendButton.disabled = false;
+        }
+    }
+    function applyChatAction(message, index) {
+        const action = message?.actions?.[index];
+        if (!action || !action.html) return;
+        const type = action.type === 'insert_html' ? 'insert' : 'replace';
+        if (type === 'replace') pushArticleSnapshot();
+        const ok = type === 'insert' ? appendToArticle(action.html) : applyWhole(action.html, { snapshot: false });
+        if (ok) {
+            message.actions.splice(index, 1);
+            persistChatHistory(); renderChatMessages(); setChatState('已应用', 'ok');
+        }
+    }
+    function clearChatHistory() {
+        if (state.chatBusy) return;
+        state.chatHistory = [];
+        persistChatHistory();
+        renderChatMessages();
+        setChatState('就绪', 'ok');
+    }
+
+    // =========================================================
     //  事件
     // =========================================================
     const updatePreview = debounce(() => {
@@ -1399,7 +2022,7 @@
             const html = elCode.value;
             const trimmed = html.trim();
             if (!trimmed) {
-                applyWhole('', { silent: true });
+                applyWhole('', { silent: true, snapshot: false });
                 setSyncState('已清空', 'ok');
                 return;
             }
@@ -1407,7 +2030,7 @@
                 setSyncState('等待完整 HTML');
                 return;
             }
-            const ok = applyWhole(trimmed, { silent: true });
+            const ok = applyWhole(trimmed, { silent: true, snapshot: false });
             setSyncState(ok ? '已同步到原生编辑区' : '同步失败', ok ? 'ok' : 'error');
         }, 450);
     }
@@ -1463,6 +2086,54 @@
         elPanel.querySelectorAll('.wh-style-tab').forEach(tab => tab.onclick = () => switchStyleMode(tab.dataset.styleMode));
         elPanel.querySelector('#wh-reading-default').onclick = () => applyReadingBackground('default');
 
+        // 本地知识库
+        elKbSearch?.addEventListener('input', renderKnowledgeList);
+        elPanel.querySelector('#wh-kb-new')?.addEventListener('click', resetKnowledgeEditor);
+        elPanel.querySelector('#wh-kb-save')?.addEventListener('click', saveKnowledgeFromEditor);
+        elPanel.querySelector('#wh-kb-import')?.addEventListener('click', () => elPanel.querySelector('#wh-kb-file')?.click());
+        elPanel.querySelector('#wh-kb-file')?.addEventListener('change', async event => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file) return;
+            try { await importKnowledgeFile(file); }
+            catch (error) { toast(error.message, 'warning'); }
+        });
+
+        // AI 对话与附件
+        elPanel.querySelector('#wh-chat-context')?.addEventListener('change', event => {
+            state.chatContextOn = Boolean(event.target.checked);
+            Config.set('chatContextOn', state.chatContextOn);
+        });
+        elPanel.querySelector('#wh-chat-send')?.addEventListener('click', sendChatMessage);
+        elPanel.querySelector('#wh-chat-clear')?.addEventListener('click', clearChatHistory);
+        elPanel.querySelector('#wh-chat-undo')?.addEventListener('click', undoLastArticleChange);
+        elPanel.querySelector('#wh-chat-attach')?.addEventListener('click', () => elChatFileInput?.click());
+        elChatFileInput?.addEventListener('change', async event => {
+            const files = [...(event.target.files || [])];
+            event.target.value = '';
+            if (!files.length) return;
+            state.chatAttachments.push(...await readAttachmentFiles(files));
+            renderChatAttachments();
+        });
+        elChatInput?.addEventListener('paste', async event => {
+            const clipboard = event.clipboardData;
+            const itemFiles = [...(clipboard?.items || [])]
+                .filter(item => item.kind === 'file')
+                .map(item => item.getAsFile?.())
+                .filter(Boolean);
+            const files = [...new Map([...((clipboard?.files || [])), ...itemFiles]
+                .filter(file => /^image\//i.test(file.type))
+                .map(file => [`${file.name}:${file.size}:${file.lastModified}`, file])).values()];
+            if (!files.length) return;
+            event.preventDefault();
+            state.chatAttachments.push(...await readAttachmentFiles(files));
+            renderChatAttachments();
+            toast('截图已添加到对话附件');
+        });
+        elChatInput?.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }
+        });
+
         // 模板菜单
         elPanel.querySelector('#wh-tpl').onclick = (e) => showTemplateMenu(e.currentTarget);
 
@@ -1477,6 +2148,8 @@
         if (name === 'code') { readFromArticle(false); updatePreview(); }
         if (name === 'ai') populateAISettings();
         if (name === 'reader') updateReadingBackgroundUI();
+        if (name === 'knowledge') renderKnowledgeList();
+        if (name === 'chat') { renderChatMessages(); renderChatAttachments(); }
         Config.set('tab', name);
     }
 
@@ -1490,6 +2163,29 @@
     // =========================================================
     //  AI API：兼容 OpenAI Chat Completions / OpenAI-compatible endpoint
     // =========================================================
+    async function requestAI(endpoint, init) {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            try {
+                const packet = await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage({ type: 'wh-ai-request', endpoint, init }, response => {
+                        const runtimeError = chrome.runtime.lastError;
+                        if (runtimeError) reject(new Error(runtimeError.message));
+                        else resolve(response);
+                    });
+                });
+                if (packet?.handled) {
+                    return {
+                        ok: Boolean(packet.ok),
+                        status: packet.status || 0,
+                        statusText: packet.statusText || '',
+                        text: async () => String(packet.text || ''),
+                        json: async () => JSON.parse(String(packet.text || '{}')),
+                    };
+                }
+            } catch (error) { log.warn('后台请求通道不可用，回退页面请求', error.message); }
+        }
+        return fetch(endpoint, init);
+    }
     function getAIConfig() {
         return {
             endpoint: Config.get('aiEndpoint', 'https://api.openai.com/v1/chat/completions'),
@@ -1579,7 +2275,7 @@
     }
 
     async function callAIForHTML(sourceHtml, instruction, cfg) {
-        const res = await fetch(cfg.endpoint, {
+        const res = await requestAI(cfg.endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1612,6 +2308,49 @@
         }
         const data = await res.json();
         return data?.choices?.[0]?.message?.content || '';
+    }
+    async function callAIChat(text, attachments) {
+        const cfg = getAIConfig();
+        if (!cfg.apiKey) { showAIConfig(); throw new Error('请先在 AI 配置页填写 API Key'); }
+        const prior = state.chatHistory.slice(0, -1).slice(-12).map(message => ({
+            role: message.role === 'assistant' ? 'assistant' : 'user',
+            content: String(message.content || '').slice(0, 12000),
+        }));
+        const parts = [{ type: 'text', text: buildChatPrompt(text, attachments) }];
+        attachments.filter(item => item.kind === 'image').forEach(item => {
+            parts.push({ type: 'image_url', image_url: { url: item.dataUrl, detail: 'auto' } });
+        });
+        const res = await requestAI(cfg.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+            body: JSON.stringify({
+                model: cfg.model,
+                temperature: 0.2,
+                messages: [
+                    {
+                        role: 'system',
+                        content: [
+                            '你是微信公众号文章和 HTML 排版助手。',
+                            '结合用户当前正文、本地知识库和附件回答问题。',
+                            '必须只返回 JSON，不要 Markdown 代码围栏。',
+                            '格式：{"reply":"给用户看的简短说明","actions":[{"type":"replace_html|insert_html","html":"可直接使用的 HTML"}]}。',
+                            '没有需要写回正文的操作时 actions 返回空数组。',
+                            'replace_html 用于整篇替换，insert_html 用于追加片段。',
+                            'HTML 必须保留用户要求保留的文字、图片 src/data-src 和链接 href；禁止 script、iframe、form、object、embed。',
+                        ].join('\n'),
+                    },
+                    ...prior,
+                    { role: 'user', content: parts.length === 1 ? parts[0].text : parts },
+                ],
+            }),
+        });
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => '');
+            throw new Error(`${res.status} ${res.statusText}${errorText ? `：${errorText.slice(0, 180)}` : ''}`);
+        }
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content || data?.output_text || '';
+        return normalizeChatResponse(Array.isArray(content) ? content.map(item => item.text || '').join('') : content);
     }
 
     // =========================================================

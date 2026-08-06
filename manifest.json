@@ -1,14 +1,17 @@
 {
     "manifest_version": 3,
     "name": "微信公众号HTML编辑器",
-    "version": "4.9.6",
-    "description": "在公众号原生左栏内嵌云中书工作台，支持 HTML 实时双向同步、页面化 AI 配置、护眼背景、图片保护与整篇排版。",
+    "version": "5.0.0",
+    "description": "在公众号原生左栏内嵌 AI 工作台，支持本地知识库、AI 对话、图片文件附件、HTML 调整与撤销。",
     "icons": {
         "48": "icon.png",
         "128": "icon.png"
     },
     "permissions": ["clipboardRead", "clipboardWrite"],
     "host_permissions": ["<all_urls>"],
+    "background": {
+        "service_worker": "background.js"
+    },
     "content_scripts": [
         {
             "matches": [
