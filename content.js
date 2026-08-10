@@ -1464,6 +1464,12 @@
                         </div>
                         <div class="wh-field">
                             <label for="wh-ai-model">模型</label>
+                            <select class="wh-input" id="wh-ai-model-choice" hidden>
+                                <option value="agnes-2.5-flash">Agnes 2.5 Flash（推荐）</option>
+                                <option value="agnes-2.5-pro">Agnes 2.5 Pro</option>
+                                <option value="agnes-2.5-pro-alpha">Agnes 2.5 Pro Alpha</option>
+                                <option value="agnes-2.0-flash">Agnes 2.0 Flash</option>
+                            </select>
                             <input class="wh-input" id="wh-ai-model" placeholder="gpt-4.1-mini">
                             <small class="wh-field-help" id="wh-ai-model-help"></small>
                         </div>
@@ -2071,6 +2077,9 @@
         elPanel.querySelector('#wh-ai-test').onclick = () => testAIConnection();
         elPanel.querySelector('#wh-ai-run').onclick = () => runAIAdjust();
         elPanel.querySelector('#wh-ai-provider').addEventListener('change', event => applyAIProviderPreset(event.target.value));
+        elPanel.querySelector('#wh-ai-model-choice').addEventListener('change', event => {
+            elPanel.querySelector('#wh-ai-model').value = event.target.value;
+        });
 
         // 美化
         elPanel.querySelector('#wh-beautify').onclick = () => {
@@ -2192,10 +2201,10 @@
             help: '填写火山方舟控制台中的推理接入点 ID（ep-...），不是展示模型名称。',
         },
         agnes: {
-            endpoint: '',
-            model: '',
-            placeholder: '填写 Agnes 提供的模型或接入点 ID',
-            help: 'Agnes 的地址和模型以你的账号控制台为准；此处按 OpenAI Chat Completions 协议调用。',
+            endpoint: 'https://apihub.agnes-ai.com/v1/chat/completions',
+            model: 'agnes-2.5-flash',
+            placeholder: '选择 Agnes 模型',
+            help: 'Agnes API 使用 Bearer Key，默认选择 Agnes 2.5 Flash；也可切换 Pro 或旧版模型。',
         },
         custom: {
             endpoint: '',
@@ -2257,6 +2266,7 @@
         const provider = elPanel?.querySelector('#wh-ai-provider');
         const endpoint = elPanel?.querySelector('#wh-ai-endpoint');
         const model = elPanel?.querySelector('#wh-ai-model');
+        const modelChoice = elPanel?.querySelector('#wh-ai-model-choice');
         const key = elPanel?.querySelector('#wh-ai-key');
         const instruction = elPanel?.querySelector('#wh-ai-instruction');
         if (provider) provider.value = cfg.provider;
@@ -2272,6 +2282,11 @@
         const model = elPanel?.querySelector('#wh-ai-model');
         const help = elPanel?.querySelector('#wh-ai-model-help');
         if (model) model.placeholder = preset.placeholder;
+        if (modelChoice) {
+            modelChoice.hidden = provider !== 'agnes';
+            model.hidden = provider === 'agnes';
+            if (provider === 'agnes') modelChoice.value = model.value || preset.model;
+        }
         if (help) help.textContent = preset.help;
     }
 
