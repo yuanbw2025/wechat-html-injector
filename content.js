@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信公众号HTML编辑器-侧边源码版
 // @namespace    https://mp.weixin.qq.com/
-// @version      5.0.0
+// @version      5.0.1
 // @description  原生左栏 AI 工作台：本地知识库、AI 对话、图片文件附件与可确认的 HTML 调整。
 // @author       AI Assistant
 // @match        https://mp.weixin.qq.com/cgi-bin/appmsg*
@@ -23,7 +23,7 @@
         warn: (m, ...a) => console.warn(`${TAG} ⚠️ ${m}`, ...a),
         error: (m, ...a) => console.error(`${TAG} ❌ ${m}`, ...a),
     };
-    log.info('脚本启动 v5.0.0 — 编辑页门禁 + 本地知识库 + AI 对话 + 附件调整');
+    log.info('脚本启动 v5.0.1 — 编辑页门禁 + 本地知识库 + AI 对话 + 附件调整');
 
     // =========================================================
     //  全局状态
@@ -1139,6 +1139,7 @@
         .wh-settings{ padding:10px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
         .wh-field{ display:flex; flex-direction:column; gap:5px; }
         .wh-field label{ font:800 11px/1 var(--wh-font); color:#475569; }
+        .wh-field-help{ color:#64748b; font:10px/1.45 var(--wh-font); }
         .wh-input,.wh-textarea{
             width:100%; box-sizing:border-box; border:1px solid var(--wh-border); border-radius:8px;
             padding:8px 9px; outline:none; font:12px/1.45 var(--wh-font); color:var(--wh-text); background:#fff;
@@ -1167,7 +1168,7 @@
         .wh-check{ display:inline-flex; align-items:center; gap:4px; font:600 10.5px/1 var(--wh-font); color:#64748b; white-space:nowrap; }
         .wh-check input{ accent-color:#07c160; }
         .wh-chat-toolbar{ justify-content:space-between; }
-        .wh-chat-messages{ flex:1; min-height:120px; overflow:auto; padding:8px; background:#f8fafc; }
+        .wh-chat-messages{ flex:1 1 auto; min-height:0; overflow:auto; padding:8px; background:#f8fafc; overscroll-behavior:contain; }
         .wh-chat-empty{ color:#94a3b8; font:11px/1.6 var(--wh-font); text-align:center; padding:22px 10px; }
         .wh-chat-message{ max-width:94%; margin:0 0 8px; display:flex; flex-direction:column; gap:4px; }
         .wh-chat-message.wh-user{ margin-left:auto; align-items:flex-end; }
@@ -1182,7 +1183,8 @@
         .wh-chat-attachment img{ width:26px; height:26px; object-fit:cover; border-radius:4px; }
         .wh-chat-attachment span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .wh-chat-attachment button{ border:0; background:transparent; color:#64748b; cursor:pointer; }
-        .wh-chat-compose{ padding:7px; border-top:1px solid var(--wh-border); background:#fff; }
+        .wh-chat-compose{ flex:0 0 auto; position:sticky; bottom:0; z-index:3; padding:7px 7px calc(12px + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--wh-border); background:#fff; box-shadow:0 -3px 10px rgba(15,23,42,.06); }
+        #wh-panel.wh-native .wh-chat-compose{ padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px)); }
         .wh-chat-input{ min-height:54px; max-height:130px; }
         .wh-chat-actions{ display:flex; align-items:center; gap:6px; margin-top:5px; }
         .wh-chat-hint{ flex:1; color:#94a3b8; font:10px/1.2 var(--wh-font); }
@@ -1438,8 +1440,8 @@
                         <div class="wh-chat-actions">
                             <button class="wh-mini-btn" id="wh-chat-attach" title="添加图片、截图或文件">📎 附件</button>
                             <input id="wh-chat-file" type="file" hidden multiple accept="image/*,.txt,.md,.markdown,.json,.csv,.html,.htm,.pdf,.docx,text/*,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-                            <span class="wh-chat-hint">粘贴截图也可以</span>
                             <button class="wh-mini-btn wh-chat-send" id="wh-chat-send">发送</button>
+                            <span class="wh-chat-hint">粘贴截图也可以</span>
                         </div>
                     </div>
                 </div>
@@ -1448,12 +1450,22 @@
                     <div class="wh-pane-title"><span>AI 与 API</span><small>本机保存</small></div>
                     <div class="wh-settings">
                         <div class="wh-field">
+                            <label for="wh-ai-provider">服务商</label>
+                            <select class="wh-input" id="wh-ai-provider">
+                                <option value="openai">OpenAI</option>
+                                <option value="doubao">豆包（火山方舟）</option>
+                                <option value="agnes">Agnes</option>
+                                <option value="custom">自定义 OpenAI 兼容</option>
+                            </select>
+                        </div>
+                        <div class="wh-field">
                             <label for="wh-ai-endpoint">API Endpoint</label>
                             <input class="wh-input" id="wh-ai-endpoint" placeholder="https://api.openai.com/v1/chat/completions">
                         </div>
                         <div class="wh-field">
                             <label for="wh-ai-model">模型</label>
                             <input class="wh-input" id="wh-ai-model" placeholder="gpt-4.1-mini">
+                            <small class="wh-field-help" id="wh-ai-model-help"></small>
                         </div>
                         <div class="wh-field">
                             <label for="wh-ai-key">API Key</label>
@@ -1465,6 +1477,7 @@
                         </div>
                         <div class="wh-settings-actions">
                             <button class="wh-mini-btn" id="wh-ai-save">保存配置</button>
+                            <button class="wh-mini-btn" id="wh-ai-test">测试连接</button>
                             <button class="wh-mini-btn" id="wh-ai-run">用 AI 调整当前正文</button>
                         </div>
                     </div>
@@ -2055,7 +2068,9 @@
         // AI
         elPanel.querySelector('#wh-ai').onclick = () => runAIAdjust();
         elPanel.querySelector('#wh-ai-save').onclick = () => saveAISettings();
+        elPanel.querySelector('#wh-ai-test').onclick = () => testAIConnection();
         elPanel.querySelector('#wh-ai-run').onclick = () => runAIAdjust();
+        elPanel.querySelector('#wh-ai-provider').addEventListener('change', event => applyAIProviderPreset(event.target.value));
 
         // 美化
         elPanel.querySelector('#wh-beautify').onclick = () => {
@@ -2163,6 +2178,39 @@
     // =========================================================
     //  AI API：兼容 OpenAI Chat Completions / OpenAI-compatible endpoint
     // =========================================================
+    const AI_PROVIDERS = {
+        openai: {
+            endpoint: 'https://api.openai.com/v1/chat/completions',
+            model: 'gpt-4.1-mini',
+            placeholder: 'gpt-4.1-mini',
+            help: '填写 OpenAI 模型名称。',
+        },
+        doubao: {
+            endpoint: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+            model: '',
+            placeholder: 'ep-2026...',
+            help: '填写火山方舟控制台中的推理接入点 ID（ep-...），不是展示模型名称。',
+        },
+        agnes: {
+            endpoint: '',
+            model: '',
+            placeholder: '填写 Agnes 提供的模型或接入点 ID',
+            help: 'Agnes 的地址和模型以你的账号控制台为准；此处按 OpenAI Chat Completions 协议调用。',
+        },
+        custom: {
+            endpoint: '',
+            model: '',
+            placeholder: '模型名称',
+            help: '填写完整的 OpenAI 兼容 Chat Completions 地址。',
+        },
+    };
+
+    function normalizeAIEndpoint(endpoint, provider) {
+        const value = String(endpoint || '').trim().replace(/\/+$/, '');
+        if (provider === 'doubao' && /\/api\/v3$/i.test(value)) return `${value}/chat/completions`;
+        return value;
+    }
+
     async function requestAI(endpoint, init) {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
             try {
@@ -2187,9 +2235,13 @@
         return fetch(endpoint, init);
     }
     function getAIConfig() {
+        const savedEndpoint = Config.get('aiEndpoint', '');
+        const provider = Config.get('aiProvider', '') || (/ark\.cn-beijing\.volces\.com/i.test(savedEndpoint) ? 'doubao' : 'openai');
+        const preset = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
         return {
-            endpoint: Config.get('aiEndpoint', 'https://api.openai.com/v1/chat/completions'),
-            model: Config.get('aiModel', 'gpt-4.1-mini'),
+            provider,
+            endpoint: normalizeAIEndpoint(savedEndpoint || preset.endpoint, provider),
+            model: Config.get('aiModel', preset.model),
             apiKey: Config.get('aiApiKey', ''),
             instruction: Config.get('aiInstruction', '优化公众号图文排版，保留原文含义、图片和链接，输出可直接粘贴到微信公众号编辑器的内联 HTML。'),
         };
@@ -2202,26 +2254,97 @@
 
     function populateAISettings() {
         const cfg = getAIConfig();
+        const provider = elPanel?.querySelector('#wh-ai-provider');
         const endpoint = elPanel?.querySelector('#wh-ai-endpoint');
         const model = elPanel?.querySelector('#wh-ai-model');
         const key = elPanel?.querySelector('#wh-ai-key');
         const instruction = elPanel?.querySelector('#wh-ai-instruction');
+        if (provider) provider.value = cfg.provider;
         if (endpoint) endpoint.value = cfg.endpoint;
         if (model) model.value = cfg.model;
         if (key) key.value = cfg.apiKey;
         if (instruction) instruction.value = cfg.instruction;
+        updateAIProviderHelp(cfg.provider);
     }
 
-    function saveAISettings() {
-        const endpoint = elPanel.querySelector('#wh-ai-endpoint').value.trim();
+    function updateAIProviderHelp(provider) {
+        const preset = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
+        const model = elPanel?.querySelector('#wh-ai-model');
+        const help = elPanel?.querySelector('#wh-ai-model-help');
+        if (model) model.placeholder = preset.placeholder;
+        if (help) help.textContent = preset.help;
+    }
+
+    function applyAIProviderPreset(provider) {
+        const preset = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
+        const endpoint = elPanel.querySelector('#wh-ai-endpoint');
+        const model = elPanel.querySelector('#wh-ai-model');
+        endpoint.value = preset.endpoint;
+        model.value = preset.model;
+        updateAIProviderHelp(provider);
+    }
+
+    function saveAISettings(options = {}) {
+        const provider = elPanel.querySelector('#wh-ai-provider').value;
+        const preset = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
+        const endpoint = normalizeAIEndpoint(elPanel.querySelector('#wh-ai-endpoint').value, provider);
         const model = elPanel.querySelector('#wh-ai-model').value.trim();
         const apiKey = elPanel.querySelector('#wh-ai-key').value.trim();
         const instruction = elPanel.querySelector('#wh-ai-instruction').value.trim();
-        Config.set('aiEndpoint', endpoint || 'https://api.openai.com/v1/chat/completions');
-        Config.set('aiModel', model || 'gpt-4.1-mini');
+        Config.set('aiProvider', provider);
+        Config.set('aiEndpoint', endpoint || preset.endpoint);
+        Config.set('aiModel', model || preset.model);
         Config.set('aiApiKey', apiKey);
         Config.set('aiInstruction', instruction || getAIConfig().instruction);
-        toast('API 配置已保存');
+        if (endpoint !== elPanel.querySelector('#wh-ai-endpoint').value.trim()) elPanel.querySelector('#wh-ai-endpoint').value = endpoint;
+        if (!options.silent) toast('API 配置已保存');
+        return getAIConfig();
+    }
+
+    async function testAIConnection() {
+        const button = elPanel.querySelector('#wh-ai-test');
+        const oldText = button.textContent;
+        const cfg = saveAISettings({ silent: true });
+        if (!cfg.endpoint || !cfg.model || !cfg.apiKey) {
+            toast('请先填写完整的 Endpoint、模型和 API Key', 'warning');
+            return;
+        }
+        button.disabled = true;
+        button.textContent = '测试中...';
+        try {
+            const res = await requestAI(cfg.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+                body: JSON.stringify({
+                    model: cfg.model,
+                    temperature: 0,
+                    max_tokens: 8,
+                    messages: [{ role: 'user', content: '只回复 OK' }],
+                }),
+            });
+            if (!res.ok) {
+                const errorText = await res.text().catch(() => '');
+                throw new Error(formatAIError(res.status, res.statusText, errorText));
+            }
+            const data = await res.json();
+            if (!data?.choices?.[0]?.message?.content && !data?.output_text) throw new Error('服务已响应，但没有返回可识别的内容');
+            toast('API 连接成功');
+        } catch (error) {
+            toast(`连接失败：${error.message}`, 'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = oldText;
+        }
+    }
+
+    function formatAIError(status, statusText, body) {
+        let detail = String(body || '').trim();
+        try {
+            const parsed = JSON.parse(detail);
+            detail = parsed?.error?.message || parsed?.message || detail;
+        } catch {}
+        detail = detail.replace(/\s+/g, ' ').slice(0, 180);
+        return `${status || '网络错误'}${statusText ? ` ${statusText}` : ''}${detail ? `：${detail}` : ''}`;
     }
 
     function stripCodeFence(text) {
@@ -2304,7 +2427,7 @@
         });
         if (!res.ok) {
             const text = await res.text().catch(() => '');
-            throw new Error(`${res.status} ${res.statusText}${text ? `：${text.slice(0, 180)}` : ''}`);
+            throw new Error(formatAIError(res.status, res.statusText, text));
         }
         const data = await res.json();
         return data?.choices?.[0]?.message?.content || '';
@@ -2346,7 +2469,7 @@
         });
         if (!res.ok) {
             const errorText = await res.text().catch(() => '');
-            throw new Error(`${res.status} ${res.statusText}${errorText ? `：${errorText.slice(0, 180)}` : ''}`);
+            throw new Error(formatAIError(res.status, res.statusText, errorText));
         }
         const data = await res.json();
         const content = data?.choices?.[0]?.message?.content || data?.output_text || '';

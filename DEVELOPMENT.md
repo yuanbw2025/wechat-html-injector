@@ -87,7 +87,10 @@ v4.9 起，插件按壹伴类形态优先挂载到微信公众号编辑页原生
 - AI 调整走 OpenAI-compatible `/v1/chat/completions`。Endpoint、模型、API Key、默认指令统一在 AI 配置页维护，不再用 `prompt()` 连续弹窗；API Key 只存在本机 `localStorage`，返回 HTML 仍通过 `applyWhole()` 写回原生编辑区。
 - 图片不走微信上传接口逆向。可靠路径是：用户先用公众号原生能力上传/粘贴图片，插件扫描编辑区里的最终 `<img>` URL，再在 HTML 中引用。
 
-## AI 工作台与本地知识库（v5.0）
+## AI 工作台与本地知识库（v5.0.1）
+
+- API 配置支持 OpenAI、豆包（火山方舟）、Agnes 与自定义 OpenAI-compatible 服务，并提供最小请求的连接测试。
+- 豆包 Endpoint 使用 `/api/v3/chat/completions`，模型字段应填写火山方舟推理接入点 ID（`ep-...`）。
 
 - `content.js` 的 **知识** 页面把排版格式、常用指令和参考文档存到 IndexedDB；无法使用 IndexedDB 时回退到现有 `localStorage` 配置。
 - **对话** 页面使用当前正文、关键词检索到的本地知识和用户主动添加的附件组装上下文。
