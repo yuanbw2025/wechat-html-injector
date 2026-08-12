@@ -2220,6 +2220,13 @@
         return value;
     }
 
+    function extractAIContent(data) {
+        const candidates = [data?.choices?.[0]?.message?.content, data?.choices?.[0]?.text, data?.output_text, data?.response, data?.result];
+        const value = candidates.find(item => typeof item === 'string' && item.trim()) || candidates.find(item => Array.isArray(item) && item.length);
+        if (Array.isArray(value)) return value.map(item => typeof item === 'string' ? item : (item?.text || item?.content || '')).join('');
+        return typeof value === 'string' ? value : '';
+    }
+
     async function requestAI(endpoint, init) {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
             try {
@@ -2342,7 +2349,7 @@
                 throw new Error(formatAIError(res.status, res.statusText, errorText));
             }
             const data = await res.json();
-            if (!data?.choices?.[0]?.message?.content && !data?.output_text) throw new Error('服务已响应，但没有返回可识别的内容');
+            if (!extractAIContent(data)) throw new Error('服务已响应，但没有返回可识别的内容');
             toast('API 连接成功');
         } catch (error) {
             toast(`连接失败：${error.message}`, 'error');
@@ -2445,7 +2452,7 @@
             throw new Error(formatAIError(res.status, res.statusText, text));
         }
         const data = await res.json();
-        return data?.choices?.[0]?.message?.content || '';
+        return extractAIContent(data);
     }
     async function callAIChat(text, attachments) {
         const cfg = getAIConfig();
@@ -2487,8 +2494,7 @@
             throw new Error(formatAIError(res.status, res.statusText, errorText));
         }
         const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content || data?.output_text || '';
-        return normalizeChatResponse(Array.isArray(content) ? content.map(item => item.text || '').join('') : content);
+        return normalizeChatResponse(extractAIContent(data));
     }
 
     // =========================================================
