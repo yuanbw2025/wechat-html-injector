@@ -2287,6 +2287,7 @@
     function updateAIProviderHelp(provider) {
         const preset = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
         const model = elPanel?.querySelector('#wh-ai-model');
+        const modelChoice = elPanel?.querySelector('#wh-ai-model-choice');
         const help = elPanel?.querySelector('#wh-ai-model-help');
         if (model) model.placeholder = preset.placeholder;
         if (modelChoice) {
