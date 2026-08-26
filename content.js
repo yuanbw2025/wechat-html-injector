@@ -1148,6 +1148,19 @@
         .wh-input:focus,.wh-textarea:focus{ border-color:#07c160; box-shadow:0 0 0 2px rgba(7,193,96,.12); }
         .wh-settings-actions{ display:flex; gap:8px; }
         .wh-settings-actions .wh-mini-btn{ flex:1; height:30px; }
+        .wh-api-status{ display:flex; align-items:center; gap:7px; min-height:30px; padding:6px 9px; border:1px solid var(--wh-border); border-radius:8px; background:#f8fafc; color:#64748b; font:700 11px/1.35 var(--wh-font); }
+        .wh-api-status-mark{ width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#cbd5e1; color:#fff; font-size:11px; }
+        .wh-api-status.wh-success{ border-color:#86efac; background:#f0fdf4; color:#166534; }
+        .wh-api-status.wh-success .wh-api-status-mark{ background:#16a34a; }
+        .wh-api-status.wh-error{ border-color:#fca5a5; background:#fef2f2; color:#b91c1c; }
+        .wh-api-status.wh-error .wh-api-status-mark{ background:#dc2626; }
+        .wh-api-log{ max-height:72px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; color:#64748b; font:10px/1.45 var(--wh-font); }
+        .wh-api-profiles{ display:flex; flex-direction:column; gap:6px; padding-top:2px; }
+        .wh-api-profile{ display:flex; align-items:center; gap:7px; padding:7px 8px; border:1px solid var(--wh-border); border-radius:7px; background:#fff; }
+        .wh-api-profile-main{ flex:1; min-width:0; }
+        .wh-api-profile-name{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#334155; font:800 11px/1.3 var(--wh-font); }
+        .wh-api-profile-meta{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#94a3b8; font:10px/1.3 var(--wh-font); }
+        .wh-api-profile .wh-mini-btn{ flex:0 0 auto; }
 
         /* ---- 本地知识库与 AI 对话 ---- */
         .wh-kb-toolbar,.wh-chat-toolbar{ display:flex; gap:6px; align-items:center; padding:7px; border-bottom:1px solid var(--wh-border); background:#f8fafc; }
@@ -1340,7 +1353,6 @@
                     <button class="wh-rail-btn" data-tab="code" title="HTML"><b>&lt;/&gt;</b><span>HTML</span></button>
                     <button class="wh-rail-btn" data-tab="image" title="图片"><b>▧</b><span>图片</span></button>
                     <button class="wh-rail-btn" data-tab="knowledge" title="知识库"><b>知</b><span>知识</span></button>
-                    <button class="wh-rail-btn" data-tab="chat" title="AI 对话"><b>AI</b><span>对话</span></button>
                     <button class="wh-rail-btn" data-tab="ai" title="AI"><b>AI</b><span>配置</span></button>
                 </div>
                 <div class="wh-rail-spacer"></div>
@@ -1426,26 +1438,6 @@
                     </div>
                 </div>
 
-                <div class="wh-pane" data-pane="chat">
-                    <div class="wh-pane-title"><span>AI 对话</span><small id="wh-chat-state">就绪</small></div>
-                    <div class="wh-chat-toolbar">
-                        <label class="wh-check"><input type="checkbox" id="wh-chat-context"> 带上当前正文</label>
-                        <button class="wh-mini-btn" id="wh-chat-undo" title="撤销 AI 上次修改">撤销</button>
-                        <button class="wh-mini-btn" id="wh-chat-clear">清空对话</button>
-                    </div>
-                    <div class="wh-chat-messages" id="wh-chat-messages"></div>
-                    <div class="wh-chat-attachments" id="wh-chat-attachments"></div>
-                    <div class="wh-chat-compose">
-                        <textarea class="wh-textarea wh-chat-input" id="wh-chat-input" placeholder="告诉 AI 要如何调整文章、HTML 或排版"></textarea>
-                        <div class="wh-chat-actions">
-                            <button class="wh-mini-btn" id="wh-chat-attach" title="添加图片、截图或文件">📎 附件</button>
-                            <input id="wh-chat-file" type="file" hidden multiple accept="image/*,.txt,.md,.markdown,.json,.csv,.html,.htm,.pdf,.docx,text/*,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-                            <button class="wh-mini-btn wh-chat-send" id="wh-chat-send">发送</button>
-                            <span class="wh-chat-hint">粘贴截图也可以</span>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="wh-pane" data-pane="ai">
                     <div class="wh-pane-title"><span>AI 与 API</span><small>本机保存</small></div>
                     <div class="wh-settings">
@@ -1486,6 +1478,13 @@
                             <button class="wh-mini-btn" id="wh-ai-test">测试连接</button>
                             <button class="wh-mini-btn" id="wh-ai-run">用 AI 调整当前正文</button>
                         </div>
+                        <div class="wh-api-status" id="wh-ai-status"><span class="wh-api-status-mark">⌁</span><span id="wh-ai-status-text">尚未测试连接</span></div>
+                        <div class="wh-api-log" id="wh-ai-log"></div>
+                        <button class="wh-mini-btn" id="wh-ai-profile-save">保存 API</button>
+                        <div class="wh-field">
+                            <label>已保存的 API</label>
+                            <div class="wh-api-profiles" id="wh-ai-profiles"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1505,11 +1504,6 @@
         elKbType = elPanel.querySelector('#wh-kb-type');
         elKbTags = elPanel.querySelector('#wh-kb-tags');
         elKbContent = elPanel.querySelector('#wh-kb-content');
-        elChatMessages = elPanel.querySelector('#wh-chat-messages');
-        elChatInput = elPanel.querySelector('#wh-chat-input');
-        elChatAttachments = elPanel.querySelector('#wh-chat-attachments');
-        elChatFileInput = elPanel.querySelector('#wh-chat-file');
-        elChatContext = elPanel.querySelector('#wh-chat-context');
         populateAISettings();
 
         // 恢复草稿
@@ -1521,9 +1515,6 @@
         buildReadingBackgroundPane();
         applyReadingBackground(state.readingBg, { silent: true });
         bindEvents();
-        renderChatMessages();
-        renderChatAttachments();
-        elChatContext.checked = state.chatContextOn;
         loadKnowledgeDocuments().then(docs => {
             state.knowledgeDocs = Array.isArray(docs) ? docs : [];
             state.knowledgeReady = true;
@@ -2075,6 +2066,7 @@
         elPanel.querySelector('#wh-ai').onclick = () => runAIAdjust();
         elPanel.querySelector('#wh-ai-save').onclick = () => saveAISettings();
         elPanel.querySelector('#wh-ai-test').onclick = () => testAIConnection();
+        elPanel.querySelector('#wh-ai-profile-save').onclick = () => saveAIProfile();
         elPanel.querySelector('#wh-ai-run').onclick = () => runAIAdjust();
         elPanel.querySelector('#wh-ai-provider').addEventListener('change', event => applyAIProviderPreset(event.target.value));
         elPanel.querySelector('#wh-ai-model-choice').addEventListener('change', event => {
@@ -2123,41 +2115,6 @@
             catch (error) { toast(error.message, 'warning'); }
         });
 
-        // AI 对话与附件
-        elPanel.querySelector('#wh-chat-context')?.addEventListener('change', event => {
-            state.chatContextOn = Boolean(event.target.checked);
-            Config.set('chatContextOn', state.chatContextOn);
-        });
-        elPanel.querySelector('#wh-chat-send')?.addEventListener('click', sendChatMessage);
-        elPanel.querySelector('#wh-chat-clear')?.addEventListener('click', clearChatHistory);
-        elPanel.querySelector('#wh-chat-undo')?.addEventListener('click', undoLastArticleChange);
-        elPanel.querySelector('#wh-chat-attach')?.addEventListener('click', () => elChatFileInput?.click());
-        elChatFileInput?.addEventListener('change', async event => {
-            const files = [...(event.target.files || [])];
-            event.target.value = '';
-            if (!files.length) return;
-            state.chatAttachments.push(...await readAttachmentFiles(files));
-            renderChatAttachments();
-        });
-        elChatInput?.addEventListener('paste', async event => {
-            const clipboard = event.clipboardData;
-            const itemFiles = [...(clipboard?.items || [])]
-                .filter(item => item.kind === 'file')
-                .map(item => item.getAsFile?.())
-                .filter(Boolean);
-            const files = [...new Map([...((clipboard?.files || [])), ...itemFiles]
-                .filter(file => /^image\//i.test(file.type))
-                .map(file => [`${file.name}:${file.size}:${file.lastModified}`, file])).values()];
-            if (!files.length) return;
-            event.preventDefault();
-            state.chatAttachments.push(...await readAttachmentFiles(files));
-            renderChatAttachments();
-            toast('截图已添加到对话附件');
-        });
-        elChatInput?.addEventListener('keydown', event => {
-            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }
-        });
-
         // 模板菜单
         elPanel.querySelector('#wh-tpl').onclick = (e) => showTemplateMenu(e.currentTarget);
 
@@ -2173,7 +2130,6 @@
         if (name === 'ai') populateAISettings();
         if (name === 'reader') updateReadingBackgroundUI();
         if (name === 'knowledge') renderKnowledgeList();
-        if (name === 'chat') { renderChatMessages(); renderChatAttachments(); }
         Config.set('tab', name);
     }
 
@@ -2279,9 +2235,11 @@
         if (provider) provider.value = cfg.provider;
         if (endpoint) endpoint.value = cfg.endpoint;
         if (model) model.value = cfg.model;
+        if (modelChoice) modelChoice.value = cfg.model;
         if (key) key.value = cfg.apiKey;
         if (instruction) instruction.value = cfg.instruction;
         updateAIProviderHelp(cfg.provider);
+        renderAIProfiles();
     }
 
     function updateAIProviderHelp(provider) {
@@ -2296,6 +2254,99 @@
             if (provider === 'agnes') modelChoice.value = model.value || preset.model;
         }
         if (help) help.textContent = preset.help;
+    }
+
+    function readAIProfiles() {
+        const profiles = Config.get('aiProfiles', []);
+        return Array.isArray(profiles) ? profiles : [];
+    }
+
+    function renderAIProfiles() {
+        const container = elPanel?.querySelector('#wh-ai-profiles');
+        if (!container) return;
+        const profiles = readAIProfiles();
+        container.textContent = '';
+        if (!profiles.length) {
+            const empty = document.createElement('span');
+            empty.className = 'wh-api-profile-meta';
+            empty.textContent = '还没有保存的 API';
+            container.appendChild(empty);
+            return;
+        }
+        profiles.forEach(profile => {
+            const row = document.createElement('div');
+            row.className = 'wh-api-profile';
+            const main = document.createElement('div');
+            main.className = 'wh-api-profile-main';
+            const name = document.createElement('span');
+            name.className = 'wh-api-profile-name';
+            name.textContent = profile.name;
+            const meta = document.createElement('span');
+            meta.className = 'wh-api-profile-meta';
+            meta.textContent = `${profile.provider} · ${profile.model || '未填写模型'}`;
+            main.append(name, meta);
+            const load = document.createElement('button');
+            load.className = 'wh-mini-btn';
+            load.textContent = '加载';
+            load.onclick = () => loadAIProfile(profile.id);
+            const remove = document.createElement('button');
+            remove.className = 'wh-mini-btn';
+            remove.textContent = '删除';
+            remove.onclick = () => deleteAIProfile(profile.id);
+            row.append(main, load, remove);
+            container.appendChild(row);
+        });
+    }
+
+    function saveAIProfile() {
+        const cfg = saveAISettings({ silent: true });
+        const defaultName = `${cfg.provider} · ${cfg.model || 'API'}`;
+        const name = String(prompt('给这个 API 配置起个名字', defaultName) || '').trim();
+        if (!name) return;
+        const profiles = readAIProfiles();
+        profiles.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, ...cfg, savedAt: Date.now() });
+        Config.set('aiProfiles', profiles.slice(0, 20));
+        renderAIProfiles();
+        toast('API 已保存到本机');
+    }
+
+    function loadAIProfile(id) {
+        const profile = readAIProfiles().find(item => item.id === id);
+        if (!profile) return;
+        const provider = elPanel.querySelector('#wh-ai-provider');
+        const endpoint = elPanel.querySelector('#wh-ai-endpoint');
+        const model = elPanel.querySelector('#wh-ai-model');
+        const modelChoice = elPanel.querySelector('#wh-ai-model-choice');
+        provider.value = profile.provider || 'custom';
+        endpoint.value = profile.endpoint || '';
+        model.value = profile.model || '';
+        if (modelChoice) modelChoice.value = profile.model || '';
+        elPanel.querySelector('#wh-ai-key').value = profile.apiKey || '';
+        elPanel.querySelector('#wh-ai-instruction').value = profile.instruction || '';
+        updateAIProviderHelp(provider.value);
+        saveAISettings({ silent: true });
+        toast(`已加载 API：${profile.name}`);
+    }
+
+    function deleteAIProfile(id) {
+        const profile = readAIProfiles().find(item => item.id === id);
+        if (!profile || !confirm(`删除已保存的 API“${profile.name}”？`)) return;
+        Config.set('aiProfiles', readAIProfiles().filter(item => item.id !== id));
+        renderAIProfiles();
+        toast('API 已删除');
+    }
+
+    function setAIStatus(kind, text, logText = '') {
+        const status = elPanel?.querySelector('#wh-ai-status');
+        const label = elPanel?.querySelector('#wh-ai-status-text');
+        const log = elPanel?.querySelector('#wh-ai-log');
+        if (!status || !label) return;
+        status.classList.remove('wh-success', 'wh-error');
+        status.classList.toggle('wh-success', kind === 'success');
+        status.classList.toggle('wh-error', kind === 'error');
+        status.querySelector('.wh-api-status-mark').textContent = kind === 'success' ? '✓' : kind === 'error' ? '!' : '⌁';
+        label.textContent = text;
+        if (log) log.textContent = logText;
     }
 
     function applyAIProviderPreset(provider) {
@@ -2329,11 +2380,13 @@
         const oldText = button.textContent;
         const cfg = saveAISettings({ silent: true });
         if (!cfg.endpoint || !cfg.model || !cfg.apiKey) {
+            setAIStatus('error', '连接失败：配置不完整', '请填写 Endpoint、模型和 API Key。');
             toast('请先填写完整的 Endpoint、模型和 API Key', 'warning');
             return;
         }
         button.disabled = true;
         button.textContent = '测试中...';
+        setAIStatus('pending', '正在测试连接…', `请求地址：${cfg.endpoint}\n模型：${cfg.model}`);
         try {
             const res = await requestAI(cfg.endpoint, {
                 method: 'POST',
@@ -2351,8 +2404,10 @@
             }
             const data = await res.json();
             if (!extractAIContent(data)) throw new Error('服务已响应，但没有返回可识别的内容');
+            setAIStatus('success', 'API 连接成功', `服务已响应\n模型：${cfg.model}`);
             toast('API 连接成功');
         } catch (error) {
+            setAIStatus('error', 'API 连接失败', String(error.message || error));
             toast(`连接失败：${error.message}`, 'error');
         } finally {
             button.disabled = false;
