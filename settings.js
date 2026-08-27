@@ -4,7 +4,7 @@ const enabled = $('#enabled');
 const status = $('#status');
 const customStartUrl = $('#customStartUrl');
 const customUrlStatus = $('#customUrlStatus');
-$('#downloadMac').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('mac').then(() => { status.textContent = 'macOS 安装包已下载，请双击 ZIP 解压后运行安装文件。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
+$('#downloadMac').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('mac').then(() => { status.textContent = 'macOS 安装包已下载，请双击 .pkg 文件安装。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 $('#downloadWindows').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('windows').then(() => { status.textContent = 'Windows 安装器已下载，请右键用 PowerShell 运行。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 $('#downloadLinux').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('linux').then(() => { status.textContent = 'Linux 安装器已下载，请运行脚本。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 function validStartUrl(value) {

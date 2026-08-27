@@ -86,12 +86,13 @@
     ];
   }
   async function downloadInstaller(platform) {
-    const source = await getHostSource();
     if (platform === 'mac') {
-      const script = replace(macTemplate(), source);
-      const guide = '双击此 ZIP 解压，然后双击“云中书-WPS剪存安装.command”运行。若 macOS 首次拦截，请右键该文件选择“打开”。';
-      saveZip([{ name: '云中书-WPS剪存安装.command', data: script, mode: 0o100755 }, { name: '使用说明.txt', data: guide, mode: 0o100644 }], '云中书-WPS剪存安装器.zip');
+      const response = await fetch(chrome.runtime.getURL('native-host/macos-installer.pkg'));
+      if (!response.ok) throw new Error('无法读取 macOS 安装包');
+      saveFile(new Uint8Array(await response.arrayBuffer()), '云中书-WPS剪存安装器.pkg');
+      return;
     }
+    const source = await getHostSource();
     if (platform === 'linux') saveFile(replace(linuxTemplate(), source), 'yunzhongshu-wps-clip-install.sh');
     if (platform === 'windows') saveFile(replace(windowsTemplate(), source), '云中书-WPS剪存安装.ps1');
   }
