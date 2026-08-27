@@ -81,6 +81,9 @@
 wechat-html-injector/
 ├── manifest.json   # 插件配置（Manifest V3）
 ├── background.js   # MV3 AI 请求代理，不保存用户数据
+├── web-content.js  # 任意网页剪存与网页总结入口
+├── installer.js    # 在引导页生成各系统一键安装器
+├── onboarding.html # 首次安装引导
 ├── content.js      # 核心逻辑：编辑器探测 + 双向源码读写 + 图片库 + 侧边面板 UI
 ├── icon.png        # 插件图标
 └── README.md       # 本文档
@@ -131,4 +134,6 @@ MIT — 自由使用、修改、分发。
 
 司南搜索首页已作为扩展内置的新建标签页页面，页面主体和 AI 工具索引均在本地，不依赖 Vercel、Gitee、VPN 或国外字体服务。点击搜索引擎和工具卡片时，才会按目标网站访问外部网络。扩展设置页可启用/停用司南，并复制本地页面地址配置为浏览器主页。
 
-首次使用请打开安装引导页，安装并登录 `kdocs-cli`，注册 `native-host`，再填写 WPS 文件夹或知识库目录链接。组件只在剪存时启动，空闲 5 分钟自动退出。司南设置可从扩展图标或 `settings.html` 打开。
+首次使用请打开安装引导页，按系统下载并运行“一键安装 WPS 剪存组件”，安装器会自动下载 `kdocs-cli` 和 Node.js、写入本地组件、注册 Chrome/Edge Native Messaging，并打开 WPS 登录。用户不需要寻找 `native-host` 目录、复制 JSON 或配置扩展 ID；安装器完成后回到引导页点击“检测安装状态”，再填写 WPS 文件夹或知识库目录链接。组件只在剪存时启动，空闲 5 分钟自动退出。司南设置可从扩展图标或 `settings.html` 打开。
+
+macOS 下载的 `.command` 文件可能需要右键选择“打开”；Windows 下载的 `.ps1` 文件请右键使用 PowerShell 运行；Linux 下载的 `.sh` 文件可在文件管理器中运行。安装器只从 WPS CDN 和 npmmirror 下载官方组件，不向本项目服务器上传网页内容或 API Key。正式发布到商店后，安装器会自动使用当前扩展 ID 注册 Native Messaging。

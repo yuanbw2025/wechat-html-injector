@@ -6,12 +6,9 @@
 
 ## 用户安装提示
 
-首次使用需要：
+普通用户不需要操作本目录。请在插件首次打开的安装引导页，按系统下载并运行“一键安装 WPS 剪存组件”。安装器会自动下载 `kdocs-cli` 和 Node.js、写入本地组件、注册 Chrome/Edge Native Messaging，并打开 WPS 登录。安装完成后回到引导页点击“检测安装状态”，再在网页剪存面板填写并保存 WPS 文件夹或知识库目录链接。
 
-1. 安装 `kdocs-cli` 并完成一次 `kdocs-cli auth login`。
-2. 运行对应系统的安装脚本，注册 Native Messaging host。
-3. 在插件的“网页剪存”面板填写并保存 WPS 文件夹或知识库目录链接。
-4. 确认插件的 API 配置已保存（网页总结才需要 API）。
+网页总结仍沿用公众号编辑器中保存的 API 配置；剪存本身不需要 AI API。
 
 组件只在点击剪存时由 Chrome 启动；成功或失败后保持短暂空闲，超过 5 分钟自动退出。网页正文只在本机处理，不经过本项目的远程服务器。
 
@@ -29,12 +26,12 @@
 {"ok":true,"link":"https://www.kdocs.cn/l/...","message":"已创建并验证 WPS 文档"}
 ```
 
-## 注册
+## 开发者手动注册（仅用于调试）
 
-先把 `host-manifest.example.json` 中的 `allowed_origins` 替换为实际扩展 ID，再执行：
+正式用户请使用插件内的一键安装器。调试本地源码时，才需要把 `host-manifest.example.json` 中的 `allowed_origins` 替换为实际扩展 ID，再执行：
 
 ```bash
 ./install-macos.sh
 ```
 
-Chrome 扩展商店发布后，安装包应由项目发布页或安装引导页提供。Chrome 不允许扩展在安装时静默写入本机文件，因此这里需要用户首次运行一次安装脚本。
+Chrome 扩展不允许网页静默写入本机文件，因此无论使用一键安装器还是调试脚本，都需要用户首次确认运行一次本地安装程序。

@@ -50,7 +50,9 @@
     $('.close').addEventListener('click', close);
     $('.save').addEventListener('click', async () => { const url = target.value.trim(); await cfgSet({ wpsTargetUrl: url }); setStatus(url ? 'WPS 目标已保存到本机。' : '已清除 WPS 目标。', 'ok'); });
     $('.setup').addEventListener('click', () => {
-        setStatus('请安装项目 native-host 目录中的本地组件，并运行安装脚本注册 Native Messaging。安装后重新点击剪存即可自动启动。', '');
+        chrome.runtime.sendMessage({ type: 'open-onboarding' }, response => {
+            if (chrome.runtime.lastError || !response?.ok) setStatus('无法打开安装引导，请从扩展图标打开设置页。', 'error');
+        });
     });
     $('.clip').addEventListener('click', () => runClip());
     $('.summary').addEventListener('click', () => runSummary());
@@ -159,8 +161,8 @@
         }));
     }
     function formatNativeError(result) {
-        if (result.code === 'NATIVE_UNAVAILABLE') return '本地剪存组件未安装或未注册。请点击“查看组件安装说明”，完成一次安装后重试。';
-        if (result.code === 'NOT_AUTHENTICATED') return 'WPS CLI 尚未登录，请先运行 kdocs-cli auth login。';
+        if (result.code === 'NATIVE_UNAVAILABLE') return '本地剪存组件未安装或未注册。请点击“查看组件安装说明”，下载并运行对应系统的安装器后重试。';
+        if (result.code === 'NOT_AUTHENTICATED') return 'WPS 尚未登录，请回到安装引导或设置页重新检测并完成登录。';
         return result.error || result.message || '本地剪存失败，请查看组件日志。';
     }
     chrome.runtime.onMessage.addListener(message => { if (message?.type === 'web-clip-trigger') open('clip'); if (message?.type === 'web-summary-trigger') open('summary'); });

@@ -1,6 +1,9 @@
 const target = document.querySelector('#target');
 const status = document.querySelector('#status');
 const saveStatus = document.querySelector('#saveStatus');
+document.querySelector('#downloadMac').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('mac').catch(error => { status.textContent = error.message; status.className = 'status error'; }));
+document.querySelector('#downloadWindows').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('windows').catch(error => { status.textContent = error.message; status.className = 'status error'; }));
+document.querySelector('#downloadLinux').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('linux').catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 chrome.storage.local.get(['wpsTargetUrl']).then(data => { target.value = data.wpsTargetUrl || ''; });
 document.querySelector('#save').addEventListener('click', async () => { await chrome.storage.local.set({ wpsTargetUrl: target.value.trim() }); saveStatus.textContent = target.value.trim() ? '已保存到本机。' : '已清除。'; saveStatus.className = 'status ok'; });
 document.querySelector('#test').addEventListener('click', () => {

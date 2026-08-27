@@ -7,6 +7,8 @@ const path = require('path');
 
 const IDLE_MS = 5 * 60 * 1000;
 const CLIP_FOLDER_NAME = '网页剪存';
+const CLI_NAME = process.platform === 'win32' ? 'kdocs-cli.exe' : 'kdocs-cli';
+const CLI_PATH = process.env.YUNZHONGSHU_KDOCS_CLI || path.join(os.homedir(), '.yunzhongshu', 'bin', CLI_NAME);
 let idleTimer;
 function armExit() { clearTimeout(idleTimer); idleTimer = setTimeout(() => process.exit(0), IDLE_MS); }
 let input = Buffer.alloc(0); const queue = []; const waiters = [];
@@ -19,7 +21,7 @@ function runCli(service, action, params, timeout = 120000) {
   return new Promise((resolve, reject) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yunzhongshu-')); const payload = path.join(dir, 'request.json');
     fs.writeFileSync(payload, JSON.stringify(params), { mode: 0o600 });
-    const child = spawn('kdocs-cli', [service, action, '--file', payload, '--output', 'json', '--timeout', String(timeout)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(CLI_PATH, [service, action, '--file', payload, '--output', 'json', '--timeout', String(timeout)], { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', d => { stdout += d; }); child.stderr.on('data', d => { stderr += d; });
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('WPS CLI 请求超时')); }, timeout + 3000);
@@ -98,7 +100,7 @@ async function ensureClipFolder(target) {
 }
 async function status() {
   return new Promise(resolve => {
-    const child = spawn('kdocs-cli', ['auth', 'status'], { stdio: ['ignore', 'pipe', 'pipe'] }); let output = '';
+    const child = spawn(CLI_PATH, ['auth', 'status'], { stdio: ['ignore', 'pipe', 'pipe'] }); let output = '';
     child.stdout.on('data', d => { output += d; }); child.stderr.on('data', d => { output += d; });
     child.on('error', error => resolve({ ok: false, code: 'CLI_UNAVAILABLE', error: error.message }));
     child.on('close', code => resolve({ ok: true, authenticated: code === 0 && !/未登录|not authenticated|no token/i.test(output), message: '本地组件可用' }));

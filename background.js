@@ -10,6 +10,11 @@ chrome.runtime.onInstalled.addListener(details => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === 'open-onboarding') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
+        sendResponse({ ok: true });
+        return false;
+    }
     if (!message || message.type !== 'wh-fetch-image') return false;
     const url = String(message.url || '');
     if (!/^https?:\/\//i.test(url)) { sendResponse({ ok: false, error: '图片地址无效' }); return false; }
