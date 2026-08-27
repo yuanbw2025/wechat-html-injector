@@ -1,18 +1,27 @@
 {
     "manifest_version": 3,
     "name": "微信公众号HTML编辑器",
-    "version": "5.0.2",
-    "description": "在公众号原生左栏内嵌 AI 工作台，支持本地知识库、AI 对话、图片文件附件、HTML 调整与撤销。",
+    "version": "5.1.0",
+    "description": "全网页剪存到 WPS 知识库，并保留图片、代码块；同时提供微信公众号 HTML 编辑工作台。",
     "icons": {
         "48": "icon.png",
         "128": "icon.png"
     },
-    "permissions": ["clipboardRead", "clipboardWrite"],
+    "permissions": ["clipboardRead", "clipboardWrite", "storage", "contextMenus", "commands"],
     "host_permissions": ["<all_urls>"],
     "background": {
         "service_worker": "background.js"
     },
     "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "exclude_matches": [
+                "https://mp.weixin.qq.com/cgi-bin/appmsg*",
+                "https://mp.weixin.qq.com/appmsg/*"
+            ],
+            "js": ["web-content.js"],
+            "run_at": "document_idle"
+        },
         {
             "matches": [
                 "https://mp.weixin.qq.com/cgi-bin/appmsg*",
@@ -21,5 +30,15 @@
             "js": ["engine.js", "content.js"],
             "run_at": "document_end"
         }
-    ]
+    ],
+    "commands": {
+        "webClip": {
+            "suggested_key": {"default": "Alt+Shift+S"},
+            "description": "剪存当前网页到 WPS 知识库"
+        },
+        "webSummary": {
+            "suggested_key": {"default": "Alt+Shift+I"},
+            "description": "总结当前网页"
+        }
+    }
 }

@@ -1,0 +1,7 @@
+{
+  "name": "com.yunzhongshu.clipbridge",
+  "description": "云中书 WPS 网页剪存本地组件",
+  "path": "/ABSOLUTE/PATH/TO/wechat-html-injector/native-host/host.js",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://YOUR_EXTENSION_ID/"]
+}

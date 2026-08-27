@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信公众号HTML编辑器-侧边源码版
 // @namespace    https://mp.weixin.qq.com/
-// @version      5.0.1
+    // @version      5.1.0
 // @description  原生左栏 AI 工作台：本地知识库、AI 对话、图片文件附件与可确认的 HTML 调整。
 // @author       AI Assistant
 // @match        https://mp.weixin.qq.com/cgi-bin/appmsg*
@@ -23,7 +23,7 @@
         warn: (m, ...a) => console.warn(`${TAG} ⚠️ ${m}`, ...a),
         error: (m, ...a) => console.error(`${TAG} ❌ ${m}`, ...a),
     };
-    log.info('脚本启动 v5.0.1 — 编辑页门禁 + 本地知识库 + AI 对话 + 附件调整');
+    log.info('脚本启动 v5.1.0 — 编辑器工作台 + 全网页剪存');
 
     // =========================================================
     //  全局状态
@@ -2370,6 +2370,15 @@
         Config.set('aiModel', model || preset.model);
         Config.set('aiApiKey', apiKey);
         Config.set('aiInstruction', instruction || getAIConfig().instruction);
+        // 全网页剪存脚本运行在其他站点，镜像当前 AI 配置到扩展存储供网页总结使用。
+        try {
+            chrome.storage?.local?.set({
+                aiProvider: provider,
+                aiEndpoint: endpoint || preset.endpoint,
+                aiModel: model || preset.model,
+                aiApiKey: apiKey,
+            });
+        } catch { /* 非扩展环境下忽略 */ }
         if (endpoint !== elPanel.querySelector('#wh-ai-endpoint').value.trim()) elPanel.querySelector('#wh-ai-endpoint').value = endpoint;
         if (!options.silent) toast('API 配置已保存');
         return getAIConfig();
