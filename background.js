@@ -41,11 +41,17 @@ chrome.commands.onCommand.addListener((command, tab) => {
     chrome.tabs.sendMessage(tab.id, { type }).catch(() => {});
 });
 
+// 仅允许向已知的 AI 服务商域名发起代理请求，避免恶意网页诱导扩展把 API Key/正文外泄到攻击者服务器。
+const ALLOWED_AI_HOSTS = ['api.openai.com', 'ark.cn-beijing.volces.com', 'apihub.agnes-ai.com'];
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || message.type !== 'wh-ai-request') return false;
     const endpoint = String(message.endpoint || '');
-    if (!/^https?:\/\//i.test(endpoint)) {
-        sendResponse({ handled: true, ok: false, status: 0, statusText: 'Endpoint 必须使用 HTTP 或 HTTPS' });
+    let endpointUrl;
+    try { endpointUrl = new URL(endpoint); } catch { endpointUrl = null; }
+    const hostAllowed = !!endpointUrl && /^https?:$/i.test(endpointUrl.protocol) && ALLOWED_AI_HOSTS.includes(endpointUrl.hostname.toLowerCase());
+    if (!hostAllowed) {
+        sendResponse({ handled: true, ok: false, status: 0, statusText: 'Endpoint 未在允许的服务商域名列表中' });
         return false;
     }
     const init = message.init && typeof message.init === 'object' ? message.init : {};
