@@ -147,7 +147,9 @@ function renderDisabledState(){
 function initSinan(){
   const storage=globalThis.chrome?.storage?.local;
   if(!storage){renderEngines();renderCats();renderQuick();renderProjects();renderTools();return;}
-  storage.get({sinanEnabled:true}).then(cfg=>{
+  storage.get({sinanEnabled:true,customStartUrl:''}).then(cfg=>{
+    const customUrl=String(cfg.customStartUrl||'').trim();
+    if(customUrl && /^https?:\/\//i.test(customUrl) && customUrl!==location.href){location.replace(customUrl);return;}
     if(cfg.sinanEnabled===false){renderDisabledState();return;}
     renderEngines();renderCats();renderQuick();renderProjects();renderTools();
   });
