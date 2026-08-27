@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "微信公众号HTML编辑器",
-    "version": "5.1.0",
+    "version": "5.1.1",
     "description": "全网页剪存到 WPS 知识库，并保留图片、代码块；同时提供微信公众号 HTML 编辑工作台。",
     "icons": {
         "48": "icon.png",

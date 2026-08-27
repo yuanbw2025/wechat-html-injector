@@ -18,7 +18,7 @@
       <section class="panel" aria-label="网页剪存">
         <div class="head"><span>网页剪存到 WPS</span><button class="close" title="关闭">×</button></div>
         <div class="body">
-          <div class="hint">首次使用需要配置 WPS 目标文件夹，并安装本地剪存组件。组件只在剪存时启动，空闲后自动退出。</div>
+          <div class="hint">首次使用需要配置 WPS 目标目录，并安装本地剪存组件。插件会在该目录下自动创建并复用“网页剪存”文件夹，组件只在剪存时启动，空闲后自动退出。</div>
           <div class="field"><label>WPS 文件夹/知识库目录链接</label><input class="target" type="url" placeholder="https://www.kdocs.cn/..." /></div>
           <div class="field"><label>本页备注（可选）</label><textarea class="note" placeholder="例如：重点看 API 设计和代码示例"></textarea></div>
           <div class="actions"><button class="primary clip">剪存当前网页</button><button class="summary">网页总结</button></div>
@@ -137,7 +137,7 @@
             const data = await embedImages(collect()); if (note.value.trim()) data.markdown += `\n\n## 剪存备注\n\n${note.value.trim()}`;
             const result = await native({ action: 'clip', targetUrl: wpsTargetUrl, ...data });
             if (!result.ok) throw new Error(formatNativeError(result));
-            setStatus(`剪存成功：${result.link || 'WPS 已创建文档'}\n${result.message || ''}`, 'ok');
+            setStatus(`剪存成功：${result.link || 'WPS 已创建文档'}\n${result.message || ''}${result.folderLink ? `\n文件夹：${result.folderLink}` : ''}`, 'ok');
         } catch (error) { setStatus(error.message || String(error), 'error'); }
         finally { state.busy = false; }
     }

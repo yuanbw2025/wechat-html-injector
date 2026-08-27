@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信公众号HTML编辑器-侧边源码版
 // @namespace    https://mp.weixin.qq.com/
-    // @version      5.1.0
+    // @version      5.1.1
 // @description  原生左栏 AI 工作台：本地知识库、AI 对话、图片文件附件与可确认的 HTML 调整。
 // @author       AI Assistant
 // @match        https://mp.weixin.qq.com/cgi-bin/appmsg*
@@ -23,7 +23,7 @@
         warn: (m, ...a) => console.warn(`${TAG} ⚠️ ${m}`, ...a),
         error: (m, ...a) => console.error(`${TAG} ❌ ${m}`, ...a),
     };
-    log.info('脚本启动 v5.1.0 — 编辑器工作台 + 全网页剪存');
+    log.info('脚本启动 v5.1.1 — 编辑器工作台 + 全网页剪存');
 
     // =========================================================
     //  全局状态
