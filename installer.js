@@ -14,6 +14,43 @@
     const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+  function zipBytes(files) {
+    const encoder = new TextEncoder();
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const push = bytes => { chunks.push(bytes); offset += bytes.length; };
+    const u16 = value => { const bytes = new Uint8Array(2); new DataView(bytes.buffer).setUint16(0, value, true); return bytes; };
+    const u32 = value => { const bytes = new Uint8Array(4); new DataView(bytes.buffer).setUint32(0, value >>> 0, true); return bytes; };
+    const join = parts => { const size = parts.reduce((sum, part) => sum + part.length, 0); const out = new Uint8Array(size); let cursor = 0; for (const part of parts) { out.set(part, cursor); cursor += part.length; } return out; };
+    for (const file of files) {
+      const name = encoder.encode(file.name);
+      const data = typeof file.data === 'string' ? encoder.encode(file.data) : file.data;
+      const crc = crc32(data);
+      const localOffset = offset;
+      const local = join([u32(0x04034b50), u16(20), u16(0x800), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), name]);
+      push(local); push(data);
+      central.push(join([u32(0x02014b50), u16(0x0314), u16(20), u16(0x800), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32((file.mode || 0o100644) << 16), u32(localOffset), name]));
+    }
+    const centralOffset = offset;
+    for (const entry of central) push(entry);
+    const centralSize = offset - centralOffset;
+    push(join([u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralSize), u32(centralOffset), u16(0)]));
+    return join(chunks);
+  }
+  function saveZip(files, filename) {
+    const url = URL.createObjectURL(new Blob([zipBytes(files)], { type: 'application/zip' }));
+    const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
   function replace(template, source) {
     return template.join('\n').replace('__EXTENSION_ID__', chrome.runtime.id).replace('__HOST_SOURCE__', source);
   }
@@ -50,7 +87,11 @@
   }
   async function downloadInstaller(platform) {
     const source = await getHostSource();
-    if (platform === 'mac') saveFile(replace(macTemplate(), source), '云中书-WPS剪存安装.command');
+    if (platform === 'mac') {
+      const script = replace(macTemplate(), source);
+      const guide = '双击此 ZIP 解压，然后双击“云中书-WPS剪存安装.command”运行。若 macOS 首次拦截，请右键该文件选择“打开”。';
+      saveZip([{ name: '云中书-WPS剪存安装.command', data: script, mode: 0o100755 }, { name: '使用说明.txt', data: guide, mode: 0o100644 }], '云中书-WPS剪存安装器.zip');
+    }
     if (platform === 'linux') saveFile(replace(linuxTemplate(), source), 'yunzhongshu-wps-clip-install.sh');
     if (platform === 'windows') saveFile(replace(windowsTemplate(), source), '云中书-WPS剪存安装.ps1');
   }
