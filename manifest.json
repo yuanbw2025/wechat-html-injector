@@ -8,7 +8,7 @@
         "48": "icon.png",
         "128": "icon.png"
     },
-    "permissions": ["clipboardRead", "clipboardWrite", "storage", "contextMenus", "commands"],
+    "permissions": ["clipboardRead", "clipboardWrite", "storage", "contextMenus", "commands", "nativeMessaging"],
     "host_permissions": ["<all_urls>"],
     "background": {
         "service_worker": "background.js"

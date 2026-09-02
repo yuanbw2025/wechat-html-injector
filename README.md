@@ -134,6 +134,6 @@ MIT — 自由使用、修改、分发。
 
 司南搜索首页已作为扩展内置的新建标签页页面，页面主体和 AI 工具索引均在本地，不依赖 Vercel、Gitee、VPN 或国外字体服务。点击搜索引擎和工具卡片时，才会按目标网站访问外部网络。扩展设置页可启用/停用司南，也可以填写自定义主页/新标签页网址；清空后恢复司南默认地址。Chrome/Edge 仍要求用户在浏览器设置中手动确认主页地址，这是浏览器安全限制。
 
-首次使用请打开安装引导页，按系统下载并运行“一键安装 WPS 剪存组件”，安装器会自动下载 `kdocs-cli` 和 Node.js、写入本地组件、注册 Chrome/Edge Native Messaging，并打开 WPS 登录。用户不需要寻找 `native-host` 目录、复制 JSON 或配置扩展 ID；安装器完成后回到引导页点击“检测安装状态”，再填写 WPS 文件夹或知识库目录链接。组件只在剪存时启动，空闲 5 分钟自动退出。司南设置可从扩展图标或 `settings.html` 打开。
+首次使用请打开安装引导页，按系统下载并运行“一键安装 WPS 剪存组件”，安装器会自动下载 `kdocs-cli` 和 Node.js、写入本地组件、注册 Chrome/Edge Native Messaging，并打开 WPS 登录。用户不需要寻找 `native-host` 目录、复制 JSON 或配置扩展 ID；安装器完成后回到引导页点击“检测安装状态”，再填写 WPS 文件夹或知识库目录链接。网页总结的 API 可在插件设置页配置和测试，支持 OpenAI、豆包、Agnes 与自定义 OpenAI 兼容服务。组件只在剪存时启动，空闲 5 分钟自动退出。司南设置可从扩展图标或 `settings.html` 打开。
 
 macOS 下载的是原生 `.pkg` 安装包，双击后由系统安装器完成安装，不需要解压、终端或 `chmod`；若系统首次拦截，请右键选择“打开”。Windows 下载的 `.ps1` 文件请右键使用 PowerShell 运行；Linux 下载的 `.sh` 文件可在文件管理器中运行。安装器只从 WPS CDN 和 npmmirror 下载官方组件，不向本项目服务器上传网页内容或 API Key。macOS 安装包使用扩展固定 ID `fpledbkcofnlandfhncnaohbjdgphmpj` 注册 Native Messaging。

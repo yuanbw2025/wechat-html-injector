@@ -100,10 +100,10 @@ async function ensureClipFolder(target) {
 }
 async function status() {
   return new Promise(resolve => {
-    const child = spawn(CLI_PATH, ['auth', 'status'], { stdio: ['ignore', 'pipe', 'pipe'] }); let output = '';
+    const child = spawn(CLI_PATH, ['auth', 'status'], { stdio: ['ignore', 'pipe', 'pipe'] }); let output = ''; let settled = false;
     child.stdout.on('data', d => { output += d; }); child.stderr.on('data', d => { output += d; });
-    child.on('error', error => resolve({ ok: false, code: 'CLI_UNAVAILABLE', error: error.message }));
-    child.on('close', code => resolve({ ok: true, authenticated: code === 0 && !/未登录|not authenticated|no token/i.test(output), message: '本地组件可用' }));
+    child.on('error', error => { if (settled) return; settled = true; resolve({ ok: false, code: 'CLI_UNAVAILABLE', error: `找不到 WPS CLI：${CLI_PATH}\n${error.message}` }); });
+    child.on('close', code => { if (settled) return; settled = true; resolve({ ok: true, authenticated: code === 0 && !/未登录|not authenticated|no token/i.test(output), message: '本地组件可用', detail: output.trim().slice(0, 500) }); });
   });
 }
 async function clip(payload) {

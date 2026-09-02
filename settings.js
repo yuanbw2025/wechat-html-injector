@@ -4,6 +4,17 @@ const enabled = $('#enabled');
 const status = $('#status');
 const customStartUrl = $('#customStartUrl');
 const customUrlStatus = $('#customUrlStatus');
+const aiProvider = $('#aiProvider');
+const aiEndpoint = $('#aiEndpoint');
+const aiModel = $('#aiModel');
+const aiApiKey = $('#aiApiKey');
+const aiStatus = $('#aiStatus');
+const aiPresets = {
+  openai: { endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4.1-mini' },
+  doubao: { endpoint: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', model: '' },
+  agnes: { endpoint: 'https://apihub.agnes-ai.com/v1/chat/completions', model: 'agnes-2.5-flash' },
+  custom: { endpoint: '', model: '' },
+};
 $('#downloadMac').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('mac').then(() => { status.textContent = 'macOS 安装包已下载，请双击 .pkg 文件安装。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 $('#downloadWindows').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('windows').then(() => { status.textContent = 'Windows 安装器已下载，请右键用 PowerShell 运行。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
 $('#downloadLinux').addEventListener('click', () => window.YunzhongshuInstaller.downloadInstaller('linux').then(() => { status.textContent = 'Linux 安装器已下载，请运行脚本。'; status.className = 'status ok'; }).catch(error => { status.textContent = error.message; status.className = 'status error'; }));
@@ -23,6 +34,36 @@ chrome.storage.local.get({ sinanEnabled: true, customStartUrl: '' }).then(config
   enabled.checked = config.sinanEnabled !== false;
   customStartUrl.value = config.customStartUrl || '';
   renderStartUrl(customStartUrl.value.trim());
+});
+chrome.storage.local.get({ aiProvider: 'openai', aiEndpoint: '', aiModel: '', aiApiKey: '' }).then(config => {
+  aiProvider.value = config.aiProvider || 'openai';
+  aiEndpoint.value = config.aiEndpoint || aiPresets[aiProvider.value].endpoint;
+  aiModel.value = config.aiModel || aiPresets[aiProvider.value].model;
+  aiApiKey.value = config.aiApiKey || '';
+});
+aiProvider.addEventListener('change', () => {
+  const preset = aiPresets[aiProvider.value];
+  if (!aiEndpoint.value.trim() || Object.values(aiPresets).some(item => item.endpoint === aiEndpoint.value.trim())) aiEndpoint.value = preset.endpoint;
+  if (!aiModel.value.trim() || Object.values(aiPresets).some(item => item.model && item.model === aiModel.value.trim())) aiModel.value = preset.model;
+});
+$('#saveAi').addEventListener('click', async () => {
+  const endpoint = aiEndpoint.value.trim();
+  const model = aiModel.value.trim();
+  const apiKey = aiApiKey.value.trim();
+  if (!/^https?:\/\//i.test(endpoint) || !model || !apiKey) { aiStatus.textContent = '请填写完整的 Endpoint、模型和 API Key。'; aiStatus.className = 'status warn'; return; }
+  await chrome.storage.local.set({ aiProvider: aiProvider.value, aiEndpoint: endpoint, aiModel: model, aiApiKey: apiKey });
+  aiStatus.textContent = 'API 配置已保存到本机，网页总结可以使用。'; aiStatus.className = 'status ok';
+});
+$('#testAi').addEventListener('click', async () => {
+  const endpoint = aiEndpoint.value.trim(); const model = aiModel.value.trim(); const apiKey = aiApiKey.value.trim();
+  if (!/^https?:\/\//i.test(endpoint) || !model || !apiKey) { aiStatus.textContent = '请先填写完整的 Endpoint、模型和 API Key。'; aiStatus.className = 'status warn'; return; }
+  aiStatus.textContent = '测试连接中…'; aiStatus.className = 'status';
+  try {
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model, messages: [{ role: 'user', content: '只回复 OK' }], max_tokens: 8, temperature: 0 }) });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 240)}`);
+    aiStatus.textContent = 'API 连接成功。'; aiStatus.className = 'status ok';
+  } catch (error) { aiStatus.textContent = `API 连接失败：${error.message || error}`; aiStatus.className = 'status warn'; }
 });
 enabled.addEventListener('change', async () => {
   await chrome.storage.local.set({ sinanEnabled: enabled.checked });

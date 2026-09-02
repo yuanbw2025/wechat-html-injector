@@ -45,10 +45,10 @@ else
   /usr/bin/tar xzf "$TMP_DIR/node.tar.gz" -C "$NODE_DIR" --strip-components=1 2>/dev/null || fail "Node.js 压缩包损坏"
 fi
 
-PKG_ROOT="${3:-/}"
-if [ -f "$PKG_ROOT/usr/local/share/yunzhongshu/host.js" ]; then
-  /bin/cp "$PKG_ROOT/usr/local/share/yunzhongshu/host.js" "$HOST_FILE"
-  /bin/rm -rf "$PKG_ROOT/usr/local/share/yunzhongshu"
+PKG_HOST_FILE="/usr/local/share/yunzhongshu/host.js"
+if [ -f "$PKG_HOST_FILE" ]; then
+  /bin/cp "$PKG_HOST_FILE" "$HOST_FILE"
+  /bin/rm -rf "/usr/local/share/yunzhongshu"
   /bin/chmod 700 "$HOST_FILE"
 else
   fail "找不到 Native Messaging 组件文件"
