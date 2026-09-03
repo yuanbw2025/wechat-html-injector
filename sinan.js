@@ -76,7 +76,8 @@
     if (!storage) { render(); return; }
     storage.get({ sinanEnabled: true, customStartUrl: '' }).then(config => {
       const customUrl = String(config.customStartUrl || '').trim();
-      if (customUrl && /^https?:\/\//i.test(customUrl) && customUrl !== location.href) { location.replace(customUrl); return; }
+      const isBrowserInternalUrl = /^(chrome|edge|about|file):/i.test(customUrl);
+      if (customUrl && !isBrowserInternalUrl && /^https?:\/\//i.test(customUrl) && customUrl !== location.href) { location.replace(customUrl); return; }
       if (config.sinanEnabled === false) { renderDisabledState(); return; }
       render();
     });

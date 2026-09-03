@@ -82,6 +82,13 @@ $('#saveCustomUrl').addEventListener('click', async () => {
   customUrlStatus.textContent = value ? '自定义地址已保存，新建标签页下次打开时生效。' : '已恢复使用司南默认地址。';
   customUrlStatus.className = 'status ok';
 });
+$('#resetCustomUrl').addEventListener('click', async () => {
+  customStartUrl.value = '';
+  await chrome.storage.local.remove('customStartUrl');
+  renderStartUrl('');
+  customUrlStatus.textContent = '已恢复司南默认新标签页。请重新加载扩展后再测试。';
+  customUrlStatus.className = 'status ok';
+});
 $('#copyUrl').addEventListener('click', async () => { await navigator.clipboard.writeText($('#newtabUrl').textContent); status.textContent = '当前地址已复制。'; status.className = 'status ok'; });
 $('#openPage').addEventListener('click', () => chrome.tabs.create({ url: $('#newtabUrl').textContent }));
 $('#openOnboarding').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') }));
