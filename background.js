@@ -1,6 +1,8 @@
 /* MV3 请求代理：只处理当前请求，不保存 API Key、文章或附件。 */
 const NATIVE_HOST = 'com.yunzhongshu.clipbridge';
 
+chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
+
 chrome.runtime.onInstalled.addListener(details => {
     chrome.contextMenus.removeAll(() => {
         chrome.contextMenus.create({ id: 'web-clip', title: '云中书：剪存当前网页到 WPS', contexts: ['page', 'selection', 'image'] });
@@ -10,7 +12,7 @@ chrome.runtime.onInstalled.addListener(details => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === 'open-settings') {
-        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+        chrome.runtime.openOptionsPage();
         sendResponse({ ok: true });
         return false;
     }
