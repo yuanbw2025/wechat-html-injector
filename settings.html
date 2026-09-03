@@ -1,11 +1,63 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>云中书 · 司南设置</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f6f8fa;color:#24292f;font:14px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}.wrap{max-width:720px;margin:38px auto;padding:0 22px}.box{background:#fff;border:1px solid #d0d7de;border-radius:12px;padding:26px;box-shadow:0 5px 20px #0000000b}h1{font-size:23px;margin:0 0 5px;color:#6b3410}p{color:#57606a;margin:5px 0 14px}.section{border-top:1px solid #eaeef2;padding:18px 0}.section:first-of-type{margin-top:20px}.row{display:flex;align-items:center;justify-content:space-between;gap:16px}.label strong{display:block;color:#24292f}.label span{display:block;color:#6e7781;font-size:12px}.switch{position:relative;width:44px;height:24px;flex:none}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;border-radius:999px;background:#afb8c1;cursor:pointer;transition:.2s}.slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}.switch input:checked+.slider{background:#6b8f50}.switch input:checked+.slider:before{transform:translateX(20px)}.url{width:100%;padding:10px;border:1px solid #d0d7de;border-radius:7px;background:#f6f8fa;color:#57606a;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.button{border:1px solid #d0d7de;background:#fff;border-radius:7px;padding:8px 12px;cursor:pointer;color:#24292f}.primary{background:#6b3410;border-color:#6b3410;color:#fff}.status{font-size:12px;margin-top:9px}.ok{color:#1a7f37}.warn{color:#9a6700}.note{font-size:12px;color:#57606a;background:#fff8e1;border:1px solid #f0d98c;padding:10px;border-radius:7px;margin-top:10px}
-</style><style>.actions input,.actions select{flex:1;min-width:240px;padding:8px 10px;border:1px solid #d0d7de;border-radius:7px;background:#fff;color:#24292f}.actions select{flex:0 1 260px}</style></head><body><main class="wrap"><section class="box"><h1>司南首页设置</h1><p>司南页面已内置在插件中，打开新建标签页不需要访问 Vercel、Gitee 或其他国外静态站点。</p>
-<div class="section"><div class="row"><div class="label"><strong>启用司南新标签页</strong><span>开启后新建标签页进入司南；填写自定义地址后改为进入自定义页面。</span></div><label class="switch"><input id="enabled" type="checkbox"><span class="slider"></span></label></div></div>
-<div class="section"><div class="label"><strong>新标签页地址</strong><span>默认使用本地司南页面；填写自定义网址后，新建标签页会跳转到该网址。留空即可恢复司南。</span></div><div class="url" id="newtabUrl"></div><div class="actions"><button class="button primary" id="copyUrl">复制当前地址</button><button class="button" id="openPage">打开当前地址</button></div><div class="actions"><input id="customStartUrl" type="url" placeholder="自定义网址，例如 https://www.example.com/" autocomplete="url"><button class="button primary" id="saveCustomUrl">保存自定义地址</button><button class="button" id="resetCustomUrl">恢复司南</button></div><div id="customUrlStatus" class="status"></div></div>
-<div class="section"><div class="label"><strong>浏览器接管状态</strong><span>新建标签页由扩展直接接管；Chrome/Edge 不允许多功能扩展静默把主页按钮改成本地扩展页。</span></div><div class="note">如果新建标签页仍显示 Google/Bing，请重新加载本扩展，并停用其他“新标签页”扩展。主页按钮只需确认一次：点击下面的按钮会复制当前地址并打开设置页，粘贴即可。</div><div class="actions"><button class="button" id="openExtensions">打开扩展管理</button><button class="button primary" id="openChromeHomeSettings">复制地址并设置 Chrome 主页</button><button class="button" id="openChromeSettings">复制地址并设置 Chrome 启动页</button><button class="button" id="openEdgeSettings">复制地址并设置 Edge 主页</button></div></div>
-<div class="section"><div class="label"><strong>网页总结 API</strong><span>网页总结会把当前网页正文发送到你填写的 AI 服务。API Key 只保存在本机，不经过本项目服务器。</span></div><div class="actions"><select id="aiProvider"><option value="openai">OpenAI</option><option value="doubao">豆包（火山方舟）</option><option value="agnes">Agnes</option><option value="custom">自定义 OpenAI 兼容服务</option></select></div><div class="actions"><input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions" autocomplete="url"></div><div class="actions"><input id="aiModel" type="text" placeholder="模型名称，例如 gpt-4.1-mini" autocomplete="off"></div><div class="actions"><input id="aiApiKey" type="password" placeholder="API Key" autocomplete="off"><button class="button" id="testAi">测试连接</button><button class="button primary" id="saveAi">保存 API</button></div><div id="aiStatus" class="status"></div></div>
-<div class="section"><div class="label"><strong>网页剪存与 WPS</strong><span>网页剪存和司南首页互不依赖；WPS 目标目录、本地组件、API 配置请在首次使用引导中完成。</span></div><div class="actions"><button class="button" id="openOnboarding">打开安装引导</button></div></div><div id="status" class="status"></div>
-<div class="section"><div class="label"><strong>一键安装/修复本地组件</strong><span>安装器会自动下载必要程序、注册 Chrome/Edge 组件并打开 WPS 登录，不需要手动找目录或填写 JSON。</span></div><div class="actions"><button class="button primary" id="downloadMac">下载 macOS 安装器</button><button class="button" id="downloadWindows">下载 Windows 安装器</button><button class="button" id="downloadLinux">下载 Linux 安装器</button></div></div>
-</section></main><script src="installer.js"></script><script src="settings.js"></script></body></html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>云中书插件设置</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-width:600px;min-height:520px;background:#f6f8fa;color:#24292f;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}button,input,select{font:inherit}.wrap{max-width:760px;margin:0 auto;padding:20px}.head{margin-bottom:16px}.head h1{margin:0;color:#6b3410;font-size:22px}.head p{margin:3px 0 0;color:#6e7781}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:#eaeef2;border-radius:8px}.tab{height:38px;border:0;border-radius:6px;background:transparent;color:#57606a;cursor:pointer;font-weight:700}.tab.active{background:#fff;color:#6b3410;box-shadow:0 1px 4px #0002}.pane{display:none;padding-top:16px}.pane.active{display:block}.section{padding:16px 0;border-top:1px solid #d8dee4}.section:first-child{border-top:0;padding-top:0}.section h2{margin:0 0 3px;font-size:16px}.desc{margin:0 0 12px;color:#6e7781;font-size:12px}.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px}.between{justify-content:space-between}.field{width:100%;height:40px;border:1px solid #d0d7de;border-radius:6px;background:#fff;padding:0 10px;color:#24292f}.row .field{flex:1;min-width:220px}.button{height:38px;border:1px solid #d0d7de;border-radius:6px;background:#fff;padding:0 12px;color:#24292f;cursor:pointer;white-space:nowrap}.button:hover{background:#f6f8fa}.primary{border-color:#6b3410;background:#6b3410;color:#fff}.primary:hover{background:#552908}.url{padding:8px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;color:#57606a;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}.note{margin-top:10px;padding:9px 10px;border:1px solid #f0d98c;border-radius:6px;background:#fff8e1;color:#6e5b14;font-size:12px}.status{min-height:20px;margin-top:8px;color:#57606a;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}.ok{color:#1a7f37}.error{color:#cf222e}.switch{position:relative;width:42px;height:24px;flex:none}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;border-radius:999px;background:#afb8c1;cursor:pointer}.slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}.switch input:checked+.slider{background:#6b8f50}.switch input:checked+.slider:before{transform:translateX(18px)}@media(max-width:640px){html,body{min-width:360px}.wrap{padding:14px}.head p{font-size:12px}.row .field{min-width:100%}.button{flex:1}.tabs{position:sticky;top:0;z-index:2}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="head"><h1>云中书插件设置</h1><p>首页、WPS 剪存和 AI 总结都在这里配置。</p></header>
+    <nav class="tabs" aria-label="设置分类">
+      <button class="tab active" data-tab="home">首页</button>
+      <button class="tab" data-tab="wps">WPS 剪存</button>
+      <button class="tab" data-tab="ai">AI 总结</button>
+    </nav>
+
+    <section class="pane active" data-pane="home">
+      <div class="section">
+        <div class="row between"><div><h2>新标签页</h2><p class="desc">默认打开内置司南；也可以跳转到自定义网址。</p></div><label class="switch"><input id="enabled" type="checkbox"><span class="slider"></span></label></div>
+        <div class="url" id="newtabUrl"></div>
+        <div class="row"><input class="field" id="customStartUrl" type="url" placeholder="自定义新标签页网址，例如 https://www.example.com/"><button class="button primary" id="saveCustomUrl">保存</button><button class="button" id="resetCustomUrl">恢复司南</button><button class="button" id="openPage">打开测试</button></div>
+        <div id="customUrlStatus" class="status"></div>
+      </div>
+      <div class="section">
+        <h2>浏览器主页</h2><p class="desc">主页按钮可以使用司南，也可以设置成与新标签页不同的网址。</p>
+        <div class="url" id="homeUrl"></div>
+        <div class="row"><input class="field" id="customHomeUrl" type="url" placeholder="自定义主页网址；留空使用司南"><button class="button primary" id="saveHomeUrl">保存主页地址</button><button class="button" id="openHomePage">打开测试</button></div>
+        <div class="row"><button class="button primary" id="setChromeHome">复制并打开 Chrome 主页设置</button><button class="button" id="setEdgeHome">复制并打开 Edge 主页设置</button><button class="button" id="openExtensions">检查新标签页冲突</button></div>
+        <div class="note">Chrome/Edge 要求用户在主页设置里粘贴确认一次；新标签页则由扩展直接接管。如果新标签页仍显示 Google/Bing，请停用其他新标签页扩展。</div>
+        <div id="homeStatus" class="status"></div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="wps">
+      <div class="section">
+        <h2>安装或修复本地组件</h2><p class="desc">安装器会自动配置 WPS CLI 和浏览器通信组件。已经安装过也可以直接覆盖修复。</p>
+        <div class="row"><button class="button primary" id="downloadMac">下载 macOS 安装包</button><button class="button" id="downloadWindows">下载 Windows 安装器</button><button class="button" id="downloadLinux">下载 Linux 安装器</button><button class="button" id="testNative">检测组件</button></div>
+        <div id="wpsStatus" class="status"></div>
+      </div>
+      <div class="section">
+        <h2>WPS 保存目录</h2><p class="desc">填写有编辑权限的 WPS 文件夹或知识库目录。插件会在其中创建“网页剪存”文件夹。</p>
+        <div class="row"><input class="field" id="wpsTargetUrl" type="url" placeholder="https://www.kdocs.cn/..."><button class="button primary" id="saveWpsTarget">保存目录</button></div>
+        <div id="wpsTargetStatus" class="status"></div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="ai">
+      <div class="section">
+        <h2>网页总结 API</h2><p class="desc">API Key 只保存在本机。点击网页总结后，当前网页正文会发送到所选 AI 服务。</p>
+        <div class="row"><select class="field" id="aiProvider"><option value="openai">OpenAI</option><option value="doubao">豆包（火山方舟）</option><option value="agnes">Agnes</option><option value="custom">自定义 OpenAI 兼容服务</option></select></div>
+        <div class="row"><input class="field" id="aiEndpoint" type="url" placeholder="API Endpoint"></div>
+        <div class="row"><input class="field" id="aiModel" type="text" placeholder="模型名称"><input class="field" id="aiApiKey" type="password" placeholder="API Key"></div>
+        <div class="row"><button class="button" id="testAi">测试连接</button><button class="button primary" id="saveAi">保存 API</button></div>
+        <div id="aiStatus" class="status"></div>
+      </div>
+    </section>
+  </main>
+  <script src="installer.js"></script><script src="settings.js"></script>
+</body>
+</html>

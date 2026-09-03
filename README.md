@@ -82,8 +82,8 @@ wechat-html-injector/
 ├── manifest.json   # 插件配置（Manifest V3）
 ├── background.js   # MV3 AI 请求代理，不保存用户数据
 ├── web-content.js  # 任意网页剪存与网页总结入口
-├── installer.js    # 在引导页生成各系统一键安装器
-├── onboarding.html # 首次安装引导
+├── installer.js    # 在统一设置页提供各系统安装器
+├── settings.html   # 唯一设置入口：首页、WPS 剪存和 AI 总结
 ├── content.js      # 核心逻辑：编辑器探测 + 双向源码读写 + 图片库 + 侧边面板 UI
 ├── icon.png        # 插件图标
 └── README.md       # 本文档
@@ -134,6 +134,6 @@ MIT — 自由使用、修改、分发。
 
 司南搜索首页已作为扩展内置的新建标签页页面，页面主体、99 个 AI 工具和项目导航均在本地，不依赖 Vercel、Gitee、VPN 或国外字体服务。点击搜索引擎和工具卡片时，才会按目标网站访问外部网络。新建标签页由扩展直接接管；扩展设置页可填写自定义跳转网址，点击“恢复司南”即可清除旧配置。Chrome/Edge 不允许多功能扩展静默把主页按钮设为本地扩展页，设置页提供“复制当前地址并打开主页设置”的一次性确认流程。若自定义网址设置为浏览器内部地址（如 `chrome://newtab`），插件会忽略该值并继续显示司南。
 
-首次使用请打开安装引导页，按系统下载并运行“一键安装 WPS 剪存组件”，安装器会自动下载 `kdocs-cli` 和 Node.js、写入本地组件、注册 Chrome/Edge Native Messaging，并打开 WPS 登录。用户不需要寻找 `native-host` 目录、复制 JSON 或配置扩展 ID；安装器完成后回到引导页点击“检测安装状态”，再填写 WPS 文件夹或知识库目录链接。网页总结的 API 可在插件设置页配置和测试，支持 OpenAI、豆包、Agnes 与自定义 OpenAI 兼容服务。组件只在剪存时启动，空闲 5 分钟自动退出。司南设置可从扩展图标或 `settings.html` 打开。
+插件只有一个设置入口：点击工具栏中的插件图标即可打开。页面分为“首页 / WPS 剪存 / AI 总结”三个标签；首次使用在“WPS 剪存”中下载安装组件、检测状态并填写 WPS 目录，在“AI 总结”中配置和测试 OpenAI、豆包、Agnes 或自定义 OpenAI 兼容服务。插件安装后不会自动跳转到其他页面。组件只在剪存时启动，空闲 5 分钟自动退出。
 
 macOS 下载的是原生 `.pkg` 安装包，双击后由系统安装器完成安装，不需要解压、终端或 `chmod`；若系统首次拦截，请右键选择“打开”。Windows 下载的 `.ps1` 文件请右键使用 PowerShell 运行；Linux 下载的 `.sh` 文件可在文件管理器中运行。安装器只从 WPS CDN 和 npmmirror 下载官方组件，不向本项目服务器上传网页内容或 API Key。macOS 安装包使用扩展固定 ID `fpledbkcofnlandfhncnaohbjdgphmpj` 注册 Native Messaging。

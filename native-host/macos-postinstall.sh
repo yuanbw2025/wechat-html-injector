@@ -12,6 +12,7 @@ APP_DIR="$USER_HOME/.yunzhongshu"
 BIN_DIR="$APP_DIR/bin"
 NODE_DIR="$APP_DIR/node"
 HOST_FILE="$APP_DIR/host.js"
+LAUNCHER_FILE="$APP_DIR/host-launcher.sh"
 mkdir -p "$BIN_DIR" "$NODE_DIR" 2>/dev/null || exit 0
 LOG_FILE="$APP_DIR/install.log"
 exec >>"$LOG_FILE" 2>&1
@@ -45,10 +46,10 @@ else
   /usr/bin/tar xzf "$TMP_DIR/node.tar.gz" -C "$NODE_DIR" --strip-components=1 2>/dev/null || fail "Node.js 压缩包损坏"
 fi
 
-PKG_HOST_FILE="/usr/local/share/yunzhongshu/host.js"
+PKG_HOST_FILE="${YUNZHONGSHU_PKG_HOST_FILE:-/usr/local/share/yunzhongshu/host.js}"
 if [ -f "$PKG_HOST_FILE" ]; then
   /bin/cp "$PKG_HOST_FILE" "$HOST_FILE"
-  /bin/rm -rf "/usr/local/share/yunzhongshu"
+  /bin/rm -f "$PKG_HOST_FILE"
   /bin/chmod 700 "$HOST_FILE"
 else
   fail "找不到 Native Messaging 组件文件"
@@ -56,15 +57,20 @@ fi
 
 NODE_BIN="$NODE_DIR/bin/node"
 if [ -x "$NODE_BIN" ]; then
+  /usr/bin/printf '%s\n' '#!/bin/sh' "exec \"$NODE_BIN\" \"$HOST_FILE\"" > "$LAUNCHER_FILE"
+  /bin/chmod 755 "$LAUNCHER_FILE"
   for NM_DIR in "$USER_HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts" "$USER_HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"; do
     /bin/mkdir -p "$NM_DIR"
-    /usr/bin/printf '%s\n' '{"name":"com.yunzhongshu.clipbridge","description":"云中书 WPS 网页剪存","path":"'"$NODE_BIN"'","type":"stdio","args":["'"$HOST_FILE"'"],"allowed_origins":["chrome-extension://fpledbkcofnlandfhncnaohbjdgphmpj/"]}' > "$NM_DIR/com.yunzhongshu.clipbridge.json"
+    /usr/bin/printf '%s\n' '{"name":"com.yunzhongshu.clipbridge","description":"云中书 WPS 网页剪存","path":"'"$LAUNCHER_FILE"'","type":"stdio","allowed_origins":["chrome-extension://fpledbkcofnlandfhncnaohbjdgphmpj/"]}' > "$NM_DIR/com.yunzhongshu.clipbridge.json"
+    /usr/sbin/chown "$CONSOLE_USER":staff "$NM_DIR/com.yunzhongshu.clipbridge.json"
   done
 else
   fail "Node.js 未安装，暂未注册浏览器组件"
 fi
-/bin/chown -R "$CONSOLE_USER" "$APP_DIR"
-if [ -x "$BIN_DIR/kdocs-cli" ]; then /usr/bin/sudo -u "$CONSOLE_USER" env HOME="$USER_HOME" PATH="$BIN_DIR:/usr/bin:/bin" "$BIN_DIR/kdocs-cli" auth login || echo "WPS 登录未完成"; fi
+/usr/sbin/chown -R "$CONSOLE_USER":staff "$APP_DIR"
+/bin/chmod 700 "$APP_DIR"
+/bin/chmod 600 "$HOST_FILE" 2>/dev/null || true
+if [ "${YUNZHONGSHU_SKIP_LOGIN:-0}" != "1" ] && [ -x "$BIN_DIR/kdocs-cli" ]; then /usr/bin/sudo -u "$CONSOLE_USER" env HOME="$USER_HOME" PATH="$BIN_DIR:/usr/bin:/bin" "$BIN_DIR/kdocs-cli" auth login || echo "WPS 登录未完成"; fi
 
 if [ -n "$ERRORS" ]; then
   printf '%b\n' "$ERRORS" > "$APP_DIR/install-errors.txt"

@@ -6,12 +6,11 @@ chrome.runtime.onInstalled.addListener(details => {
         chrome.contextMenus.create({ id: 'web-clip', title: '云中书：剪存当前网页到 WPS', contexts: ['page', 'selection', 'image'] });
         chrome.contextMenus.create({ id: 'web-summary', title: '云中书：总结当前网页', contexts: ['page', 'selection'] });
     });
-    if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type === 'open-onboarding') {
-        chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
+    if (message?.type === 'open-settings') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
         sendResponse({ ok: true });
         return false;
     }
@@ -65,6 +64,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || message.type !== 'wh-native-request') return false;
+    if (typeof chrome.runtime.sendNativeMessage !== 'function') {
+        sendResponse({ ok: false, code: 'NATIVE_PERMISSION_MISSING', error: '扩展缺少 Native Messaging 权限，请重新加载最新版本。' });
+        return false;
+    }
     chrome.runtime.sendNativeMessage(NATIVE_HOST, message.payload || {}, response => {
         const runtimeError = chrome.runtime.lastError;
         if (runtimeError) {
