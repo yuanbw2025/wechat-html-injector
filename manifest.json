@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "微信公众号HTML编辑器",
-    "version": "5.2.0",
+    "version": "5.2.1",
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqMBz5Jw+wfDBeuXeO3/a+iVqKmf8HKDNAy44KqZq0w47qU01WxHdpVltycN7YTkrPoFP8NDKpA3m8/VuTBu/tez4NcgzaAKsL2fKgnwb8ZWcnTLVrh2BDkVY7+p1gHvndqyqnfGbi7v6rA8iR5NOD3s9jt2/mpriMkJdzMPLmOELBvKzVQUIfmP7+/DFNX5XxsuOhTB4QcZcxlD+eCcm6U8JV8uXUwDS1qRFAgnZ0/1eTFscewUEeAl4UhttSUNunncyQWcTqCytUraLMSgaCkYL0nyXy5c/UhM9/18jhj76Ig5pNoB+GAdUuRYUYUApFtl/nL41pE2zt/CXplS20QIDAQAB",
     "description": "全网页剪存到 WPS 知识库，并保留图片、代码块；同时提供微信公众号 HTML 编辑工作台。",
     "icons": {

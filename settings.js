@@ -85,5 +85,12 @@ $('#saveCustomUrl').addEventListener('click', async () => {
 $('#copyUrl').addEventListener('click', async () => { await navigator.clipboard.writeText($('#newtabUrl').textContent); status.textContent = '当前地址已复制。'; status.className = 'status ok'; });
 $('#openPage').addEventListener('click', () => chrome.tabs.create({ url: $('#newtabUrl').textContent }));
 $('#openOnboarding').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') }));
-$('#openChromeSettings').addEventListener('click', () => chrome.tabs.create({ url: 'chrome://settings/onStartup' }));
-$('#openEdgeSettings').addEventListener('click', () => chrome.tabs.create({ url: 'edge://settings/startHomeNTP' }));
+$('#openExtensions').addEventListener('click', () => chrome.tabs.create({ url: 'chrome://extensions/' }));
+async function copyAddressAndOpenSettings(url) {
+  await navigator.clipboard.writeText($('#newtabUrl').textContent);
+  status.textContent = '当前地址已复制，请在打开的主页设置中粘贴。'; status.className = 'status ok';
+  chrome.tabs.create({ url });
+}
+$('#openChromeHomeSettings').addEventListener('click', () => copyAddressAndOpenSettings('chrome://settings/appearance'));
+$('#openChromeSettings').addEventListener('click', () => copyAddressAndOpenSettings('chrome://settings/onStartup'));
+$('#openEdgeSettings').addEventListener('click', () => copyAddressAndOpenSettings('edge://settings/startHomeNTP'));
