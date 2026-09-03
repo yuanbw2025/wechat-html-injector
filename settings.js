@@ -35,11 +35,30 @@ chrome.storage.local.get({ sinanEnabled: true, customStartUrl: '' }).then(config
   customStartUrl.value = config.customStartUrl || '';
   renderStartUrl(customStartUrl.value.trim());
 });
-chrome.storage.local.get({ aiProvider: 'openai', aiEndpoint: '', aiModel: '', aiApiKey: '' }).then(config => {
+async function deriveAiKeyCryptoKey() {
+  const material = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(chrome.runtime.id));
+  return crypto.subtle.importKey('raw', material, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function encryptAiApiKey(plainText) {
+  if (!plainText) return '';
+  const key = await deriveAiKeyCryptoKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainText));
+  return { iv: Array.from(iv), data: Array.from(new Uint8Array(cipher)) };
+}
+async function decryptAiApiKey(payload) {
+  if (!payload || typeof payload !== 'object') return payload || '';
+  try {
+    const key = await deriveAiKeyCryptoKey();
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(payload.iv) }, key, new Uint8Array(payload.data));
+    return new TextDecoder().decode(plain);
+  } catch { return ''; }
+}
+chrome.storage.local.get({ aiProvider: 'openai', aiEndpoint: '', aiModel: '', aiApiKey: '' }).then(async config => {
   aiProvider.value = config.aiProvider || 'openai';
   aiEndpoint.value = config.aiEndpoint || aiPresets[aiProvider.value].endpoint;
   aiModel.value = config.aiModel || aiPresets[aiProvider.value].model;
-  aiApiKey.value = config.aiApiKey || '';
+  aiApiKey.value = await decryptAiApiKey(config.aiApiKey);
 });
 aiProvider.addEventListener('change', () => {
   const preset = aiPresets[aiProvider.value];
@@ -51,7 +70,7 @@ $('#saveAi').addEventListener('click', async () => {
   const model = aiModel.value.trim();
   const apiKey = aiApiKey.value.trim();
   if (!/^https?:\/\//i.test(endpoint) || !model || !apiKey) { aiStatus.textContent = '请填写完整的 Endpoint、模型和 API Key。'; aiStatus.className = 'status warn'; return; }
-  await chrome.storage.local.set({ aiProvider: aiProvider.value, aiEndpoint: endpoint, aiModel: model, aiApiKey: apiKey });
+  await chrome.storage.local.set({ aiProvider: aiProvider.value, aiEndpoint: endpoint, aiModel: model, aiApiKey: await encryptAiApiKey(apiKey) });
   aiStatus.textContent = 'API 配置已保存到本机，网页总结可以使用。'; aiStatus.className = 'status ok';
 });
 $('#testAi').addEventListener('click', async () => {
