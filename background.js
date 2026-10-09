@@ -1,7 +1,6 @@
 /* MV3 请求代理：只处理当前请求，不保存 API Key、文章或附件。 */
+importScripts('draft-background.js');
 const NATIVE_HOST = 'com.yunzhongshu.clipbridge';
-
-chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
 chrome.runtime.onInstalled.addListener(details => {
     chrome.contextMenus.removeAll(() => {
@@ -66,6 +65,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || message.type !== 'wh-native-request') return false;
+    if (!DraftBackground.trustedSender(sender) || !['status','clip'].includes(message.payload?.action) || JSON.stringify(message.payload).length > 32 * 1024 * 1024) {
+        sendResponse({ok:false,code:'INVALID_REQUEST',error:'本地组件请求类型、来源或大小无效'});return false;
+    }
     if (typeof chrome.runtime.sendNativeMessage !== 'function') {
         sendResponse({ ok: false, code: 'NATIVE_PERMISSION_MISSING', error: '扩展缺少 Native Messaging 权限，请重新加载最新版本。' });
         return false;

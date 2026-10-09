@@ -355,6 +355,7 @@
     }
 
     function cleanHTML(html) {
+        if (globalThis.DraftHTML) return DraftHTML.sanitize(html);
         const template = document.createElement('template');
         template.innerHTML = String(html || '');
         template.content.querySelectorAll('script,iframe,object,embed,form,link,meta,base').forEach(el => el.remove());
@@ -541,6 +542,17 @@
             toast('追加失败：' + e.message, 'error');
             return false;
         }
+    }
+
+    // The platform adapter shares the original body locator/write/sync pipeline.
+    if (globalThis.DraftPlatforms && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+        const adapter = DraftPlatforms.createWechatAdapter({findEditor, cleanHTML, applyWhole, dispatchEditorInput, getArticleHTML, getArticleImages});
+        chrome.runtime.onMessage.addListener((message, sender, respond) => {
+            if (!['draft-editor-export','draft-editor-readback','draft-editor-restore'].includes(message?.type)) return false;
+            if (sender.id !== chrome.runtime.id || sender.tab || sender.url && !sender.url.startsWith(chrome.runtime.getURL(''))) { respond({ok:false,error:'仅接受插件内部导出'}); return false; }
+            const work = message.type === 'draft-editor-export' ? adapter.exportToEditor(message.variant, message.confirmed) : message.type === 'draft-editor-restore' ? adapter.restore() : adapter.readBack().then(snapshot => ({ok:true,snapshot}));
+            work.then(respond).catch(error => respond({ok:false,error:error.message}));return true;
+        });
     }
 
     // =========================================================

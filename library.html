@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>云中书 · AI 稿件库</title>
+    <link rel="stylesheet" href="library.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <span class="brand">云中书</span
+        ><span class="subtitle">AI 稿件库与导出工作台</span>
+      </div>
+      <div class="toolbar">
+        <button id="new">新建稿件</button><button id="import">导入</button
+        ><input
+          id="importFile"
+          type="file"
+          accept=".md,.html,.json,.sfpack,.zip"
+          hidden
+        /><select id="backupScope" aria-label="备份范围">
+          <option value="all">完整稿件库</option>
+          <option value="collection">当前合集</option>
+          <option value="draft">当前稿件</option></select
+        ><button id="backup">导出备份</button
+        ><button id="settings">设置</button>
+      </div>
+    </header>
+    <div class="notice">
+      内容保存在本机。导出仅写入平台编辑器；平台最终保存或发布由你完成。
+    </div>
+    <div id="status" role="status" aria-live="polite">正在打开稿件库…</div>
+    <main>
+      <aside>
+        <div class="filters">
+          <input
+            id="search"
+            type="search"
+            placeholder="搜索标题、正文、标签"
+            aria-label="搜索稿件"
+          /><select id="collection" aria-label="合集">
+            <option value="">全部合集</option></select
+          ><select id="state" aria-label="状态">
+            <option value="">全部状态</option>
+            <option value="draft">稿件</option>
+            <option value="archived">已归档</option></select
+          ><input id="tag" placeholder="按标签筛选" aria-label="标签" />
+          <div class="toolbar">
+            <button id="addCollection">新建合集</button
+            ><button id="deleteCollection">删除合集</button>
+          </div>
+          <div id="audit"></div>
+        </div>
+        <div id="draftList" aria-label="稿件列表"></div>
+        <div id="storage"></div>
+      </aside>
+      <section class="workspace">
+        <div id="empty">
+          <p>建立自己的内容库</p>
+          <span>新建稿件、导入文件，或让 AI 直接创建并保存。</span>
+        </div>
+        <section id="editor" hidden>
+          <div class="toolbar">
+            <input
+              id="title"
+              aria-label="稿件标题"
+              placeholder="稿件标题"
+            /><button id="save" class="primary">保存新版本</button
+            ><button id="archive">归档</button>
+          </div>
+          <div class="toolbar">
+            <input
+              id="tags"
+              placeholder="标签，以逗号分隔"
+              aria-label="稿件标签"
+            /><select id="draftCollection" aria-label="稿件所属合集"></select
+            ><input id="summary" placeholder="摘要" aria-label="稿件摘要" />
+          </div>
+          <div id="identity" class="small"></div>
+          <nav class="tabs" aria-label="稿件内容">
+            <button data-pane="markdown" class="active">Markdown</button
+            ><button data-pane="html">HTML</button
+            ><button data-pane="preview">排版预览</button
+            ><button data-pane="plain">纯文本</button
+            ><button data-pane="versions">版本</button
+            ><button data-pane="assets">资源</button
+            ><button data-pane="receipts">导出回执</button>
+          </nav>
+          <section data-view="markdown">
+            <textarea
+              id="markdown"
+              aria-label="Markdown 正文"
+              spellcheck="false"
+            ></textarea
+            ><button id="renderMarkdown">将 Markdown 转为 HTML（新版本）</button
+            ><span class="small"
+              >修改 Markdown 后请转换 HTML；编辑 HTML 时以 HTML
+              为正文真源。</span
+            >
+          </section>
+          <section data-view="html" hidden>
+            <textarea
+              id="html"
+              aria-label="HTML 正文"
+              spellcheck="false"
+            ></textarea>
+          </section>
+          <section data-view="preview" hidden>
+            <iframe id="preview" title="稿件排版预览" sandbox=""></iframe>
+          </section>
+          <section data-view="plain" hidden><pre id="plain"></pre></section>
+          <section data-view="versions" hidden>
+            <div class="toolbar">
+              <select id="version" aria-label="历史版本"></select
+              ><button id="restore">恢复为新版本</button>
+            </div>
+            <div class="comparison">
+              <pre id="versionText"></pre>
+              <pre id="currentText"></pre>
+            </div>
+          </section>
+          <section data-view="assets" hidden>
+            <p class="small">
+              图片按 hash 去重。本地预览与微信 CDN
+              映射分开记录；请先在微信原生图片库上传，再映射 URL。
+            </p>
+            <input
+              id="assetFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.txt"
+            />
+            <div id="assets"></div>
+          </section>
+          <section data-view="receipts" hidden>
+            <div id="receipts"></div>
+          </section>
+          <div class="export toolbar">
+            <select id="platform" aria-label="目标平台">
+              <option value="wechat-official-account">微信公众号</option>
+              <option value="html">普通 HTML 文件</option>
+              <option value="markdown">Markdown 文件</option>
+              <option value="json">结构化 JSON</option></select
+            ><select id="targetTab" aria-label="目标编辑器标签页"></select
+            ><button id="export" class="primary">导出</button
+            ><button id="readback">从平台回读为新版本</button>
+          </div>
+        </section>
+      </section>
+      <section class="ai">
+        <h2>AI 写作</h2>
+        <p class="small">
+          使用插件设置中选择的 AI
+          服务。发送时，写作要求和当前所选稿件会交给该服务。
+        </p>
+        <label
+          ><input id="allowAI" type="checkbox" />允许 AI 写入本地稿件库</label
+        ><select id="aiMode" aria-label="AI 操作">
+          <option value="create">创建新稿件</option>
+          <option value="update">修改当前稿件</option>
+          <option value="copy">另存为新稿件</option>
+          <option value="summary">生成摘要和标签</option>
+          <option value="variant">生成微信适配版本</option></select
+        ><textarea
+          id="instruction"
+          placeholder="写作要求，或希望如何修改这篇稿件…"
+          aria-label="AI 写作要求"
+        ></textarea
+        ><button id="runAI" class="primary">生成并保存到稿件库</button>
+        <pre id="aiResult"></pre>
+        <h2>外部 Agent</h2>
+        <label
+          ><input id="allowGateway" type="checkbox" />启用本地 Draft
+          Gateway</label
+        >
+        <p class="small">
+          需新版本地组件。通过本机私有队列通信，不开放 HTTP。启用后外部 Agent
+          可持续创建和修改本地稿件。
+        </p>
+        <div id="gatewayStatus" class="small"></div>
+        <button id="pollGateway">读取本地队列</button>
+        <h2>AI 任务记录</h2>
+        <div id="aiRuns"></div>
+      </section>
+    </main>
+    <script type="module" src="library.js"></script>
+  </body>
+</html>

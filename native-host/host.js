@@ -4,6 +4,30 @@ const { URL } = require('url');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
+const DRAFT_QUEUE = process.env.YUNZHONGSHU_DRAFT_QUEUE || path.join(os.homedir(), '.yunzhongshu', 'draft-gateway');
+const AGENT_METHODS = new Set(['drafts.create','drafts.update','drafts.createRevision','drafts.createTargetVariant','drafts.get','drafts.list','drafts.search','drafts.validate']);
+function safeQueuePath(dir, name) { if (!/^[a-f0-9-]{36}\.json$/.test(name)) throw new Error('队列文件名无效'); const target=path.join(DRAFT_QUEUE,dir,name); if(fs.existsSync(target)&&fs.lstatSync(target).isSymbolicLink())throw new Error('不接受符号链接');return target; }
+function initDraftQueue() {
+  for(const directory of [DRAFT_QUEUE,path.join(DRAFT_QUEUE,'inbox'),path.join(DRAFT_QUEUE,'results')]){if(fs.existsSync(directory)&&fs.lstatSync(directory).isSymbolicLink())throw new Error('队列目录不能是符号链接');fs.mkdirSync(directory,{recursive:true,mode:0o700});fs.chmodSync(directory,0o700);}
+  const secret=path.join(DRAFT_QUEUE,'auth.key');if(fs.existsSync(secret)&&fs.lstatSync(secret).isSymbolicLink())throw new Error('鉴权文件不能是符号链接');if(!fs.existsSync(secret))fs.writeFileSync(secret,crypto.randomBytes(32).toString('hex'),{mode:0o600,flag:'wx'});return {ok:true,directory:DRAFT_QUEUE};
+}
+function queueSecret(){const key=path.join(DRAFT_QUEUE,'auth.key');if(fs.lstatSync(key).isSymbolicLink())throw new Error('鉴权文件无效');return fs.readFileSync(key,'utf8');}
+function pollDraftQueue(){
+  if(!fs.existsSync(DRAFT_QUEUE))throw new Error('请先从稿件库启用本地网关');
+  for(const name of fs.readdirSync(path.join(DRAFT_QUEUE,'inbox')).sort()){
+    const file=safeQueuePath('inbox',name);if(fs.statSync(file).size>768*1024)throw new Error('本地稿件请求超过 768 KiB');
+    const packet=JSON.parse(fs.readFileSync(file,'utf8'));const expected=crypto.createHmac('sha256',queueSecret()).update(JSON.stringify(packet.request)).digest('hex');
+    if(typeof packet.signature!=='string'||packet.signature.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(expected),Buffer.from(packet.signature)))throw new Error('本地稿件请求鉴权失败');
+    if(!AGENT_METHODS.has(packet.request?.type)||packet.request?.payload?.requestId!==name.slice(0,-5))throw new Error('本地稿件请求类型或身份无效');
+    return {ok:true,requestId:name.slice(0,-5),request:packet.request};
+  }return {ok:true};
+}
+function ackDraftQueue(payload){
+  const name=`${payload.requestId}.json`;const inbox=safeQueuePath('inbox',name);const result=safeQueuePath('results',name);
+  if(!fs.existsSync(inbox))throw new Error('请求不存在');const body=JSON.stringify(payload.result);if(body.length>768*1024)throw new Error('网关回执过大');
+  fs.writeFileSync(result,body,{mode:0o600});fs.unlinkSync(inbox);return {ok:true};
+}
 
 const IDLE_MS = 5 * 60 * 1000;
 const CLIP_FOLDER_NAME = '网页剪存';
@@ -12,7 +36,7 @@ const CLI_PATH = process.env.YUNZHONGSHU_KDOCS_CLI || path.join(os.homedir(), '.
 let idleTimer;
 function armExit() { clearTimeout(idleTimer); idleTimer = setTimeout(() => process.exit(0), IDLE_MS); }
 let input = Buffer.alloc(0); const queue = []; const waiters = [];
-process.stdin.on('data', chunk => { input = Buffer.concat([input, chunk]); while (input.length >= 4) { const length = input.readUInt32LE(0); if (input.length < length + 4) break; const body = input.subarray(4, length + 4); input = input.subarray(length + 4); let value = null; try { value = JSON.parse(body.toString('utf8')); } catch {} const waiter = waiters.shift(); if (waiter) waiter(value); else queue.push(value); } });
+process.stdin.on('data', chunk => { input = Buffer.concat([input, chunk]); while (input.length >= 4) { const length = input.readUInt32LE(0); if (length > 32 * 1024 * 1024 || queue.length > 32) { process.exit(1); return; } if (input.length < length + 4) break; const body = input.subarray(4, length + 4); input = input.subarray(length + 4); let value = null; try { value = JSON.parse(body.toString('utf8')); } catch {} const waiter = waiters.shift(); if (waiter) waiter(value); else queue.push(value); } });
 function readMessage() { if (queue.length) return Promise.resolve(queue.shift()); return new Promise(resolve => waiters.push(resolve)); }
 function send(message) {
   const body = Buffer.from(JSON.stringify(message), 'utf8'); const header = Buffer.alloc(4); header.writeUInt32LE(body.length, 0); process.stdout.write(Buffer.concat([header, body]));
@@ -145,5 +169,5 @@ async function clip(payload) {
   if (!(verify.data || verify).name) throw new Error('文档已创建，但回读验证失败');
   return { ok: true, link: file.link_url || file.url || '', folderLink: target.folderLink, message: `已创建并验证 WPS 文档，位置：${CLIP_FOLDER_NAME}（${payload.images?.length || 0} 张图片）` };
 }
-async function main() { armExit(); while (true) { const payload = await readMessage(); if (!payload) { send({ ok: false, code: 'INVALID_REQUEST', error: '请求格式无效' }); continue; } try { send(payload.action === 'status' ? await status() : await clip(payload)); } catch (error) { send({ ok: false, code: /auth|token|401|403|未登录/i.test(error.message) ? 'NOT_AUTHENTICATED' : 'CLIP_FAILED', error: error.message }); } armExit(); } }
+async function main() { armExit(); while (true) { const payload = await readMessage(); if (!payload || !['status','clip','draft-gateway-init','draft-gateway-poll','draft-gateway-ack'].includes(payload.action)) { send({ ok: false, code: 'INVALID_REQUEST', error: '请求格式或类型无效' }); continue; } try { send(payload.action === 'status' ? await status() : payload.action === 'draft-gateway-init' ? initDraftQueue() : payload.action === 'draft-gateway-poll' ? pollDraftQueue() : payload.action === 'draft-gateway-ack' ? ackDraftQueue(payload) : await clip(payload)); } catch (error) { send({ ok: false, code: /auth|token|401|403|未登录/i.test(error.message) ? 'NOT_AUTHENTICATED' : 'NATIVE_FAILED', error: error.message }); } armExit(); } }
 main();

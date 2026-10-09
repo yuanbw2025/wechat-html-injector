@@ -1,0 +1,16 @@
+{
+  "name": "ai-draft-workspace",
+  "version": "6.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser-smoke.js",
+    "pack:storyforge": "node scripts/build-storyforge-pack.js"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.4",
+    "jsdom": "26.1.0",
+    "playwright": "1.56.1"
+  }
+}

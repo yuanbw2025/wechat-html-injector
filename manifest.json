@@ -1,20 +1,22 @@
 {
     "manifest_version": 3,
-    "name": "微信公众号HTML编辑器",
-    "version": "5.2.3",
+    "name": "云中书 AI 稿件库与导出工作台",
+    "version": "6.0.0",
+    "minimum_chrome_version": "116",
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqMBz5Jw+wfDBeuXeO3/a+iVqKmf8HKDNAy44KqZq0w47qU01WxHdpVltycN7YTkrPoFP8NDKpA3m8/VuTBu/tez4NcgzaAKsL2fKgnwb8ZWcnTLVrh2BDkVY7+p1gHvndqyqnfGbi7v6rA8iR5NOD3s9jt2/mpriMkJdzMPLmOELBvKzVQUIfmP7+/DFNX5XxsuOhTB4QcZcxlD+eCcm6U8JV8uXUwDS1qRFAgnZ0/1eTFscewUEeAl4UhttSUNunncyQWcTqCytUraLMSgaCkYL0nyXy5c/UhM9/18jhj76Ig5pNoB+GAdUuRYUYUApFtl/nL41pE2zt/CXplS20QIDAQAB",
-    "description": "全网页剪存到 WPS 知识库，并保留图片、代码块；同时提供微信公众号 HTML 编辑工作台。",
+    "description": "本地 AI 稿件库、版本与内容包备份，主动导出到微信公众号编辑器；保留 WPS 网页剪存和司南首页。",
     "icons": {
         "48": "icon.png",
         "128": "icon.png"
     },
-    "permissions": ["clipboardRead", "clipboardWrite", "storage", "contextMenus", "commands", "nativeMessaging"],
+    "permissions": ["clipboardRead", "clipboardWrite", "storage", "contextMenus", "commands", "nativeMessaging", "offscreen", "unlimitedStorage", "alarms"],
     "host_permissions": ["<all_urls>"],
     "background": {
         "service_worker": "background.js"
     },
     "action": {
-        "default_title": "打开云中书插件设置"
+        "default_title": "打开云中书插件菜单",
+        "default_popup": "popup.html"
     },
     "options_page": "settings.html",
     "chrome_url_overrides": {
@@ -35,7 +37,7 @@
                 "https://mp.weixin.qq.com/cgi-bin/appmsg*",
                 "https://mp.weixin.qq.com/appmsg/*"
             ],
-            "js": ["engine.js", "content.js"],
+            "js": ["engine.js", "draft-sanitize.js", "platform-adapters/wechat.js", "content.js"],
             "run_at": "document_end"
         }
     ],

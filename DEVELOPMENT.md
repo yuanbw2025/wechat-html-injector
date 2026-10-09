@@ -128,3 +128,13 @@ v4.9 起，插件按壹伴类形态优先挂载到微信公众号编辑页原生
 | ❌ 不要在 my-website 里直接改本项目代码 | 会导致 subtree pull 冲突 |
 
 > **架构变更记录**：2026-05-26 之前采用"主库开发 → 镜像推送"模式。现已改为"独立仓库开发 → 主库集成"模式。
+
+## AI 稿件库 v6
+
+架构、API、内容包、安全限制、测试与恢复方案见 [AI-DRAFT-WORKSPACE.md](docs/AI-DRAFT-WORKSPACE.md)。本轮仅在本仓库功能分支开发，没有同步 StoryForge、my-website 或线上部署。
+
+稿件主数据只由 offscreen 页面中的 Draft Gateway 写入 extension-origin IndexedDB。Service Worker 不持有常驻稿件变量，网页 content script 只负责平台编辑器读写，不获得稿件库管理权限。文件用同源 IndexedDB 的临时 Blob 通道，不把数百 MB 的图片包塞进 runtime JSON 消息。
+
+开发检查：`npm ci`、`npm test`、`npm run test:browser`。浏览器测试在独立 Chrome/Edge 资料中运行，使用本机模拟 AI 服务，不调用真实服务商，不触碰用户日常浏览器；需要本机已安装 Chrome/Edge 和已生成的真实内容包。依赖仅用于开发，扩展运行无需 Node、npm 或 `.codex` 目录。
+
+注意：以下旧章节是历史版本设计说明；v6 AI 配置读取统一设置页的 `chrome.storage.local`，稿件库采用新增数据库，旧知识库与剪存配置保留。新稿件 HTML 使用 DOM 白名单清洗；不要根据旧的正则清洗描述削弱新边界。
